@@ -127,18 +127,26 @@ gracefully (logs to console) when opened outside a session.
 
 ## Roadmap
 
-Decided by grilling its own author with it (2026-07-06) — priorities by 100-point
-allocation: new widget types 30 · reliability 25 · interview flow 25 · theming 20.
+Decided by grilling the author with the tool itself (two sessions, 2026-07-06;
+final consolidated read: **accepted**). This is a personal tool (audience 10/100)
+built to a high polish bar (investment 90/100), for grilling ANY plan — code,
+CPA study, school, life projects.
 
-- ~~New widget types~~ shipped: risk-matrix and free-text-form (the interview's
-  must-haves); nice-to-haves A/B compare and heat-map grid remain open; explicit
-  won't-dos: emoji reaction bar, budget range, timeline picker
-- Port the CPA v3 Night / Sepia / Sakura themes with a theme picker
-- ~~Interview flow~~ shipped: growing single-page interviews — ＋ appends questions
-  in place, answers batch locally until one user-controlled send
-- Exploration: a "3D something" — a spatial widget for conveying what words can't
-  (author's ask; shape TBD)
-- Every interview asks a minimum of three widget questions (now a SKILL.md rule)
+1. **Theme port** — Sakura first, then Sepia (author's ranking; Night only as the
+   system-dark auto-switch target; Paper stays default). Architecture: the agent
+   bakes the theme into each interview page at write time — no live picker.
+2. **relation-canvas widget** — the demystified "3D something": a draggable
+   Excalidraw-style node/edge diagram (e.g. database relations) emitting graph
+   JSON. The moment it serves: "let me show you how these relate."
+3. **A/B compare widget** — UI variants side-by-side first (screenshots/mockups,
+   pick + why); code-approaches mode after.
+4. **Heat-map grid widget.**
+5. npm publish eventually; sharing publicly is gated on: more real-world use,
+   a demo GIF, and a docs/install polish pass.
+
+Top project risk (author-placed, likelihood 84/impact 85): abandonment — the
+mitigation is grilling a real project every week. Opening batch size target: ~5
+questions (3 is the hard minimum).
 
 ## Requirements
 

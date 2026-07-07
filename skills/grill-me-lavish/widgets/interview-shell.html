@@ -21,6 +21,13 @@
   <script>), bump the qNN id everywhere in the block, adapt the controls from any
   widget in this folder, and implement collect() returning {summary, data} (or
   null while incomplete). gml.bindSection wires auto-queue + progress.
+
+  IMPORTANT: auto-queue only fires on interaction. Any section whose controls
+  START at your recommended answer (pre-positioned dot, pre-ordered list,
+  pre-set slider) must include a native checkbox like
+  <label class="accept"><input type="checkbox"> The default is right</label>
+  so accepting without touching still queues; collect() returns non-null when
+  touched OR that box is checked. Otherwise silent agreement is lost.
 -->
 <html lang="en">
 <head>
@@ -63,7 +70,7 @@ button.send:disabled{opacity:.4;cursor:not-allowed}
 </style>
 </head>
 <body>
-<div class="progress"><div class="inner"><span class="plabel">Progress</span><span id="gml-chips"></span></div></div>
+<div class="progress"><div class="inner"><span class="plabel">Progress</span><span id="gml-chips" style="display:flex;flex-wrap:wrap;gap:6px;min-width:0;flex:1"></span></div></div>
 <script>
 // Interview runtime: auto-queue per section (replace-on-requeue), progress strip,
 // queue restore after live reloads (chrome replays lavish:queue-state).
