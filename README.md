@@ -115,6 +115,7 @@ npx -y github:hotredsam/grill-me-lavish end <html-file>    # end a session
 | `annotation-canvas` | words fail — sketch it freehand with a note |
 | `risk-matrix` | several risks need triage on likelihood × impact — quadrant = action |
 | `free-text-form` | the user wants to write, with structure — labeled prompts, keyed answers |
+| `bubble-burst` | interview opener — tap-to-select bubble cloud for mass context intake |
 
 Every widget emits structured JSON through the injected SDK
 (`window.lavish.queuePrompt(...)` with a `data` payload). Each widget file is
@@ -132,6 +133,8 @@ allocation: new widget types 30 · reliability 25 · interview flow 25 · themin
   won't-dos: emoji reaction bar, budget range, timeline picker
 - Port the CPA v3 Night / Sepia / Sakura themes with a theme picker
 - Interview flow: instant response to ＋ More questions, visible interview progress
+- Exploration: a "3D something" — a spatial widget for conveying what words can't
+  (author's ask; shape TBD)
 - Every interview asks a minimum of three widget questions (now a SKILL.md rule)
 
 ## Requirements

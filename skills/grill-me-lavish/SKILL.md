@@ -103,6 +103,11 @@ decision type and exact output shape.
 | When words fail: freeform sketch plus note | `widgets/annotation-canvas.html` |
 | Triage several risks on likelihood × impact (quadrant = action) | `widgets/risk-matrix.html` |
 | The user wants to WRITE, with structure — 2-4 labeled prompts, keyed answers | `widgets/free-text-form.html` |
+| Mass context intake at interview START — 30-50 tap-to-select bubbles | `widgets/bubble-burst.html` |
+
+Consider OPENING the interview with `bubble-burst.html` — 30-50 pre-generated
+context bubbles knock out a pile of basics in seconds before the one-at-a-time
+deep questions begin.
 
 Default to `suggested-answer.html` when you have a strong recommendation and just need a
 gut-check; default to `confidence-slider.html` for ordinary single questions. Reach
