@@ -110,6 +110,21 @@ function loadQueuedPrompts() {
   }
 }
 
+// grill-me-lavish: mirror the queue into the artifact iframe so pages can show
+// which questions already have queued answers (survives live reloads).
+function broadcastQueueState() {
+  postToFrame({
+    type: "lavish:queueState",
+    prompts: queued.map((item) => ({
+      prompt: String(item.prompt || ""),
+      tag: String(item.tag || ""),
+      text: String(item.text || ""),
+      selector: String(item.selector || ""),
+      queueKey: String(item._lavishQueueKey || ""),
+    })),
+  });
+}
+
 function persistQueuedPrompts() {
   try {
     if (queued.length) {
@@ -120,6 +135,7 @@ function persistQueuedPrompts() {
   } catch {
     // The in-memory queue still works if browser storage is unavailable.
   }
+  broadcastQueueState();
 }
 
 function render() {
@@ -819,6 +835,9 @@ frame.addEventListener("load", () => {
   postToFrame({ type: "lavish:setAnnotationMode", enabled: annotation && !ended });
   // Replay the pre-reload scroll position so hot reloads don't jump the artifact to the top.
   postToFrame({ type: "lavish:restoreScroll", x: lastScroll.x, y: lastScroll.y });
+  // grill-me-lavish: replay the queue so the page can re-mark answered sections
+  // after a live reload - queued answers are never lost, and now they LOOK it.
+  broadcastQueueState();
 });
 
 initializeLayoutGate();

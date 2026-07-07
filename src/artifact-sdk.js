@@ -1056,13 +1056,19 @@ export function createArtifactSdk(
     sendQueuedPrompts,
     sendPrompt,
     endSession,
-    getQueuedPrompts: () => [],
+    getQueuedPrompts: () => queueState.slice(),
     setStatus: (message) => parent.postMessage({ type: "lavish:status", message: String(message) }, "*"),
     snapshot,
   };
 
+  let queueState = [];
+
   window.addEventListener("message", (event) => {
     const msg = event.data || {};
+    if (msg.type === "lavish:queueState") {
+      queueState = Array.isArray(msg.prompts) ? msg.prompts : [];
+      document.dispatchEvent(new CustomEvent("lavish:queue-state", { detail: { prompts: queueState } }));
+    }
     if (msg.type === "lavish:setAnnotationMode") setAnnotationMode(msg.enabled);
     if (msg.type === "lavish:requestSnapshot") {
       parent.postMessage({ type: "lavish:snapshot", snapshot: snapshot() }, "*");

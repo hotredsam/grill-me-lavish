@@ -58,13 +58,17 @@ npx cache). If engine output shows a follow-up command starting with
    opening batch: strongly consider a `bubble-burst` section first for mass
    context intake, then 2+ deeper sections (the 3-minimum is satisfied on first
    render). Each section = one decision, built by adapting the matching widget
-   from `widgets/` into the shell's SECTION BLOCK pattern (unique `qNN` id,
-   controls + a Queue-answer button calling `gml.queueAnswer`).
+   from `widgets/` into the shell's SECTION BLOCK pattern: unique `qNN` id,
+   controls, and a `gml.bindSection("qNN", collect)` script where `collect`
+   returns `{summary, data}` (or null while incomplete). Answers AUTO-QUEUE as
+   controls change — no per-section buttons; the progress strip and per-section
+   "saved ✓" line show state, and the chrome replays the queue after every live
+   reload so answered sections stay visibly answered.
 2. Open it: `npx -y github:hotredsam/grill-me-lavish .grill-me-lavish/<slug>-interview.html`.
 3. Long-poll: `npx -y github:hotredsam/grill-me-lavish poll <same file>`. Leave it
    running (background task if your harness limits foreground duration; re-run if
    killed — queued feedback is never lost).
-4. Answers arrive as a BATCH when the user presses "Send all answers" — could be
+4. Answers arrive as a BATCH when the user presses "Send N answers" — could be
    3 or 100. Parse each prompt's `Context data:` JSON block. Freeform annotations
    and chat messages ride along; treat them as interview input.
 5. When a prompt's data is `{ widget: "meta", request: "more-questions" }` (the
