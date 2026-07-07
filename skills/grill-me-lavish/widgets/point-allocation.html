@@ -1,0 +1,139 @@
+<!doctype html>
+<!--
+  grill-me-lavish widget: point-allocation
+  Decision type: intensity of preference — spend exactly 100 points across options.
+  Forces real tradeoffs (unlike "rate each 1-5" where everything can be a 5) and
+  reveals HOW MUCH more one option matters than another.
+  Emits (via window.lavish.queuePrompt options.data):
+    { widget: "point-allocation", question: "...", allocations: { "Option": points, ... }, total: 100 }
+  Adapt: edit the CONFIG block. Set CONFIG.options values to your recommended split.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>grill-me-lavish · Allocate 100 points</title>
+<style>
+:root{--bg:#14161a;--card:#1d2026;--text:#e8eaed;--muted:#9aa0a6;--accent:#f4c95d;--border:#2c3038;--good:#7dc98f;--bad:#e07a7a}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;display:flex;justify-content:center;padding:32px 16px}
+main{width:100%;max-width:680px}
+.kicker{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+h1{font-size:24px;margin:0 0 8px}
+.context{color:var(--muted);margin:0 0 16px}
+.rec{background:rgba(244,201,93,.08);border:1px solid rgba(244,201,93,.35);border-radius:10px;padding:10px 14px;margin:0 0 20px;font-size:14px}
+.rec b{color:var(--accent);font-weight:600;margin-right:6px}
+.row{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:8px}
+.row .top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
+.row .pts{font-variant-numeric:tabular-nums;font-weight:700;color:var(--accent)}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.budget{display:flex;justify-content:space-between;align-items:center;margin:12px 0 0;font-size:14px}
+.budget .left{font-variant-numeric:tabular-nums}
+.budget .left.over{color:var(--bad);font-weight:600}
+.budget .left.exact{color:var(--good);font-weight:600}
+.budget button{background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:6px 12px;font-size:13px;cursor:pointer}
+.budget button:hover{color:var(--text);border-color:var(--muted)}
+.footer{display:flex;align-items:center;gap:16px;margin-top:20px}
+.status{flex:1;font-size:13px;color:var(--muted);margin:0}
+.status.sent{color:var(--good)}
+button.send{background:var(--accent);color:#1a1a1a;border:0;border-radius:10px;padding:12px 20px;font-size:15px;font-weight:600;cursor:pointer}
+button.send:disabled{opacity:.4;cursor:not-allowed}
+button.more-qs{background:none;border:1px dashed var(--border);color:var(--muted);border-radius:50px;padding:10px 16px;font-size:13px;cursor:pointer}
+button.more-qs:hover{color:var(--accent);border-color:var(--accent)}
+</style>
+</head>
+<body>
+<main data-lavish-question="point-allocation">
+  <p class="kicker">grill-me-lavish · spend 100 points</p>
+  <h1 id="question"></h1>
+  <p class="context" id="context"></p>
+  <div class="rec"><b>Agent recommends</b> <span id="recommendation"></span></div>
+  <div id="rows"></div>
+  <div class="budget">
+    <span class="left" id="left"></span>
+    <button type="button" id="balance">Auto-balance to 100</button>
+  </div>
+  <div class="footer">
+    <p class="status" id="status">Sliders start at the agent's recommended split.</p>
+    <button class="more-qs" id="moreQs" type="button" title="Tell the agent to go deeper on this topic">＋ More questions</button>
+    <button class="send" id="send">Send allocation to agent</button>
+  </div>
+</main>
+<script>
+const CONFIG = {
+  question: "Spend 100 points across these concerns",
+  context: "Points force tradeoffs: giving one option more means another gets less. The split reveals intensity, not just order.",
+  recommendation: "The pre-set split below.",
+  options: { "Correctness": 40, "Speed of delivery": 30, "Performance": 20, "Polish": 10 },
+};
+
+document.getElementById("question").textContent = CONFIG.question;
+document.getElementById("context").textContent = CONFIG.context;
+document.getElementById("recommendation").textContent = CONFIG.recommendation;
+
+const rows = document.getElementById("rows");
+for (const [name, pts] of Object.entries(CONFIG.options)) {
+  const div = document.createElement("div");
+  div.className = "row";
+  div.innerHTML = '<div class="top"><span class="name"></span><span class="pts"></span></div>' +
+    '<input type="range" min="0" max="100" step="5">';
+  div.querySelector(".name").textContent = name;
+  const slider = div.querySelector("input");
+  slider.value = pts;
+  slider.dataset.name = name;
+  rows.appendChild(div);
+}
+
+const sliders = [...rows.querySelectorAll("input[type=range]")];
+function total() { return sliders.reduce((sum, s) => sum + Number(s.value), 0); }
+function refresh() {
+  for (const s of sliders) s.closest(".row").querySelector(".pts").textContent = s.value + " pts";
+  const t = total();
+  const left = document.getElementById("left");
+  left.textContent = t === 100 ? "100 / 100 — balanced" : t + " / 100 (" + (t > 100 ? (t - 100) + " over" : (100 - t) + " left") + ")";
+  left.className = "left " + (t === 100 ? "exact" : t > 100 ? "over" : "");
+  document.getElementById("send").disabled = t !== 100;
+}
+rows.addEventListener("input", refresh);
+document.getElementById("balance").addEventListener("click", () => {
+  const t = total();
+  if (t === 0) { sliders.forEach((s) => { s.value = Math.round(100 / sliders.length / 5) * 5; }); }
+  else {
+    let acc = 0;
+    sliders.forEach((s, i) => {
+      if (i === sliders.length - 1) { s.value = 100 - acc; return; }
+      const v = Math.round((Number(s.value) / t) * 100 / 5) * 5;
+      s.value = v; acc += v;
+    });
+  }
+  refresh();
+});
+refresh();
+
+function markSent(msg) {
+  const s = document.getElementById("status");
+  s.textContent = msg;
+  s.classList.add("sent");
+}
+document.getElementById("send").addEventListener("click", () => {
+  const allocations = {};
+  for (const s of sliders) allocations[s.dataset.name] = Number(s.value);
+  const summary = "Point allocation: " + Object.entries(allocations).map(([k, v]) => k + "=" + v).join(", ");
+  const data = { widget: "point-allocation", question: CONFIG.question, allocations, total: 100 };
+  if (!window.lavish) { console.log("[grill-me-lavish]", summary, data); markSent("No Lavish session — logged to console."); return; }
+  window.lavish.queuePrompt(summary, { tag: "grill-answer", text: summary, element: document.querySelector("main"), data });
+  window.lavish.sendQueuedPrompts();
+  markSent("Sent ✓ — adjust and send again if you change your mind; the agent uses the latest.");
+});
+
+document.getElementById("moreQs").addEventListener("click", () => {
+  const summary = "User pressed 'More questions' — offer additional, deeper questions on this topic before moving on.";
+  const data = { widget: "meta", request: "more-questions", about: CONFIG.question };
+  if (!window.lavish) { console.log("[grill-me-lavish]", summary, data); markSent("No Lavish session — logged to console."); return; }
+  window.lavish.queuePrompt(summary, { tag: "grill-meta", text: "More questions requested", element: document.querySelector("main"), data });
+  window.lavish.sendQueuedPrompts();
+  markSent("Asked for more questions ✓ — the agent will dig deeper here.");
+});
+</script>
+</body>
+</html>

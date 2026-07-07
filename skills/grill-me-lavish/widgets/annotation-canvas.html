@@ -1,0 +1,173 @@
+<!doctype html>
+<!--
+  grill-me-lavish widget: annotation-canvas
+  Decision type: when words fail — layout ideas, rough flows, spatial intuitions.
+  The user sketches freehand and adds a note; the sketch is sent as a downscaled
+  PNG data URL. The agent should save the base64 payload to a .png file and Read
+  it as an image.
+  Emits (via window.lavish.queuePrompt options.data):
+    { widget: "annotation-canvas", question: "...", note: "...",
+      strokes: n, imageDataUrl: "data:image/png;base64,..." (omitted if canvas empty) }
+  Adapt: edit the CONFIG block. Optionally set CONFIG.background to a short prompt
+  drawn faintly on the canvas (e.g. "sketch the dashboard layout").
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>grill-me-lavish · Sketch it</title>
+<style>
+:root{--bg:#14161a;--card:#1d2026;--text:#e8eaed;--muted:#9aa0a6;--accent:#f4c95d;--border:#2c3038;--good:#7dc98f}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;display:flex;justify-content:center;padding:32px 16px}
+main{width:100%;max-width:680px}
+.kicker{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+h1{font-size:24px;margin:0 0 8px}
+.context{color:var(--muted);margin:0 0 16px}
+.rec{background:rgba(244,201,93,.08);border:1px solid rgba(244,201,93,.35);border-radius:10px;padding:10px 14px;margin:0 0 20px;font-size:14px}
+.rec b{color:var(--accent);font-weight:600;margin-right:6px}
+.toolbar{display:flex;gap:8px;margin-bottom:8px;align-items:center}
+.toolbar button{background:var(--card);border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:6px 12px;font-size:13px;cursor:pointer}
+.toolbar button.active,.toolbar button:hover{color:var(--text);border-color:var(--accent)}
+canvas{width:100%;background:#fdfdf8;border:1px solid var(--border);border-radius:12px;cursor:crosshair;touch-action:none;display:block}
+textarea{width:100%;margin-top:12px;background:var(--card);border:1px solid var(--border);border-radius:12px;color:var(--text);font:14px/1.5 inherit;padding:12px;resize:vertical;min-height:60px}
+.footer{display:flex;align-items:center;gap:16px;margin-top:20px}
+.status{flex:1;font-size:13px;color:var(--muted);margin:0}
+.status.sent{color:var(--good)}
+button.send{background:var(--accent);color:#1a1a1a;border:0;border-radius:10px;padding:12px 20px;font-size:15px;font-weight:600;cursor:pointer}
+button.send:disabled{opacity:.4;cursor:not-allowed}
+button.more-qs{background:none;border:1px dashed var(--border);color:var(--muted);border-radius:50px;padding:10px 16px;font-size:13px;cursor:pointer}
+button.more-qs:hover{color:var(--accent);border-color:var(--accent)}
+</style>
+</head>
+<body>
+<main data-lavish-question="annotation-canvas">
+  <p class="kicker">grill-me-lavish · sketch + note</p>
+  <h1 id="question"></h1>
+  <p class="context" id="context"></p>
+  <div class="rec"><b>Agent asks</b> <span id="recommendation"></span></div>
+  <div class="toolbar">
+    <button type="button" id="pen" class="active">✏️ Pen</button>
+    <button type="button" id="eraser">🧽 Eraser</button>
+    <button type="button" id="undo">↩ Undo</button>
+    <button type="button" id="clear">Clear</button>
+  </div>
+  <canvas id="canvas" width="800" height="500" data-lavish-action="sketch"></canvas>
+  <textarea id="note" placeholder="Explain the sketch (or skip the sketch and just write)"></textarea>
+  <div class="footer">
+    <p class="status" id="status">Sketch and/or write, then send.</p>
+    <button class="more-qs" id="moreQs" type="button" title="Tell the agent to go deeper on this topic">＋ More questions</button>
+    <button class="send" id="send">Send sketch to agent</button>
+  </div>
+</main>
+<script>
+const CONFIG = {
+  question: "Show me what you mean",
+  context: "Rough is fine — boxes, arrows, and stick figures beat three paragraphs of prose.",
+  recommendation: "Sketch it however it lives in your head; the note field is for anything the drawing can't say.",
+  background: "",
+};
+
+document.getElementById("question").textContent = CONFIG.question;
+document.getElementById("context").textContent = CONFIG.context;
+document.getElementById("recommendation").textContent = CONFIG.recommendation;
+
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+ctx.lineCap = ctx.lineJoin = "round";
+function paintBase() {
+  ctx.fillStyle = "#fdfdf8";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  if (CONFIG.background) {
+    ctx.fillStyle = "#c9c9bd";
+    ctx.font = "20px system-ui";
+    ctx.textAlign = "center";
+    ctx.fillText(CONFIG.background, canvas.width / 2, 34);
+  }
+}
+paintBase();
+
+let mode = "pen", drawing = false, strokes = 0;
+const history = [ctx.getImageData(0, 0, canvas.width, canvas.height)];
+function pos(e) {
+  const r = canvas.getBoundingClientRect();
+  return { x: (e.clientX - r.left) * (canvas.width / r.width), y: (e.clientY - r.top) * (canvas.height / r.height) };
+}
+canvas.addEventListener("pointerdown", (e) => {
+  drawing = true;
+  canvas.setPointerCapture(e.pointerId);
+  ctx.strokeStyle = mode === "pen" ? "#22262e" : "#fdfdf8";
+  ctx.lineWidth = mode === "pen" ? 3 : 24;
+  const p = pos(e);
+  ctx.beginPath();
+  ctx.moveTo(p.x, p.y);
+  ctx.lineTo(p.x + 0.01, p.y + 0.01);
+  ctx.stroke();
+});
+canvas.addEventListener("pointermove", (e) => {
+  if (!drawing) return;
+  const p = pos(e);
+  ctx.lineTo(p.x, p.y);
+  ctx.stroke();
+});
+canvas.addEventListener("pointerup", () => {
+  if (!drawing) return;
+  drawing = false;
+  strokes++;
+  history.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+  if (history.length > 30) history.splice(1, 1);
+});
+function setMode(m) {
+  mode = m;
+  document.getElementById("pen").classList.toggle("active", m === "pen");
+  document.getElementById("eraser").classList.toggle("active", m === "eraser");
+}
+document.getElementById("pen").addEventListener("click", () => setMode("pen"));
+document.getElementById("eraser").addEventListener("click", () => setMode("eraser"));
+document.getElementById("undo").addEventListener("click", () => {
+  if (history.length > 1) { history.pop(); strokes = Math.max(0, strokes - 1); }
+  ctx.putImageData(history[history.length - 1], 0, 0);
+});
+document.getElementById("clear").addEventListener("click", () => {
+  paintBase();
+  strokes = 0;
+  history.length = 0;
+  history.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+});
+
+function markSent(msg) {
+  const s = document.getElementById("status");
+  s.textContent = msg;
+  s.classList.add("sent");
+}
+document.getElementById("send").addEventListener("click", () => {
+  const note = document.getElementById("note").value.trim();
+  if (!strokes && !note) { markSent("Nothing to send yet — sketch or write something first."); return; }
+  const data = { widget: "annotation-canvas", question: CONFIG.question, note, strokes };
+  if (strokes > 0) {
+    // Downscale to keep the base64 payload small enough for the agent's context.
+    const small = document.createElement("canvas");
+    small.width = 480; small.height = 300;
+    small.getContext("2d").drawImage(canvas, 0, 0, small.width, small.height);
+    data.imageDataUrl = small.toDataURL("image/png");
+  }
+  const summary = "Sketch answer (" + strokes + " stroke" + (strokes === 1 ? "" : "s") + ")" +
+    (note ? " — note: " + note : "") +
+    (strokes > 0 ? ". Save data.imageDataUrl to a .png and view it." : "");
+  if (!window.lavish) { console.log("[grill-me-lavish]", summary, data); markSent("No Lavish session — logged to console."); return; }
+  window.lavish.queuePrompt(summary, { tag: "grill-answer", text: summary, element: document.querySelector("main"), data });
+  window.lavish.sendQueuedPrompts();
+  markSent("Sent ✓ — keep sketching and send again if needed; the agent uses the latest.");
+});
+
+document.getElementById("moreQs").addEventListener("click", () => {
+  const summary = "User pressed 'More questions' — offer additional, deeper questions on this topic before moving on.";
+  const data = { widget: "meta", request: "more-questions", about: CONFIG.question };
+  if (!window.lavish) { console.log("[grill-me-lavish]", summary, data); markSent("No Lavish session — logged to console."); return; }
+  window.lavish.queuePrompt(summary, { tag: "grill-meta", text: "More questions requested", element: document.querySelector("main"), data });
+  window.lavish.sendQueuedPrompts();
+  markSent("Asked for more questions ✓ — the agent will dig deeper here.");
+});
+</script>
+</body>
+</html>

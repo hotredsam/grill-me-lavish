@@ -1,0 +1,183 @@
+<!doctype html>
+<!--
+  grill-me-lavish widget: decision-matrix
+  Decision type: rate several options across several criteria (1-5). Good when a
+  choice has multiple dimensions and you want to see WHERE options win and lose,
+  not just which one wins overall.
+  Emits (via window.lavish.queuePrompt options.data):
+    { widget: "decision-matrix", question: "...",
+      ratings: { "Option": { "Criterion": 1-5, ... }, ... },
+      totals: { "Option": n, ... } }
+  Adapt: edit the CONFIG block. Pre-fill CONFIG.prefill with your recommended ratings
+  (or leave cells null to force the user to rate them).
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>grill-me-lavish · Decision matrix</title>
+<style>
+:root{--bg:#14161a;--card:#1d2026;--text:#e8eaed;--muted:#9aa0a6;--accent:#f4c95d;--border:#2c3038;--good:#7dc98f}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;display:flex;justify-content:center;padding:32px 16px}
+main{width:100%;max-width:760px}
+.kicker{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+h1{font-size:24px;margin:0 0 8px}
+.context{color:var(--muted);margin:0 0 16px}
+.rec{background:rgba(244,201,93,.08);border:1px solid rgba(244,201,93,.35);border-radius:10px;padding:10px 14px;margin:0 0 20px;font-size:14px}
+.rec b{color:var(--accent);font-weight:600;margin-right:6px}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:520px}
+th,td{border:1px solid var(--border);padding:10px 12px;text-align:center;font-size:14px}
+th{background:var(--card)}
+th.opt{text-align:left}
+td.opt{text-align:left;font-weight:600;background:var(--card)}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.seg label{padding:5px 9px;cursor:pointer;font-size:13px;color:var(--muted);border-right:1px solid var(--border)}
+.seg label:last-child{border-right:0}
+.seg input{display:none}
+.seg label:has(input:checked){background:var(--accent);color:#1a1a1a;font-weight:700}
+td.total{font-weight:700;font-variant-numeric:tabular-nums}
+td.total.best{color:var(--accent)}
+.legend{font-size:12px;color:var(--muted);margin:8px 0 0}
+.footer{display:flex;align-items:center;gap:16px;margin-top:20px}
+.status{flex:1;font-size:13px;color:var(--muted);margin:0}
+.status.sent{color:var(--good)}
+button.send{background:var(--accent);color:#1a1a1a;border:0;border-radius:10px;padding:12px 20px;font-size:15px;font-weight:600;cursor:pointer}
+button.send:disabled{opacity:.4;cursor:not-allowed}
+button.more-qs{background:none;border:1px dashed var(--border);color:var(--muted);border-radius:50px;padding:10px 16px;font-size:13px;cursor:pointer}
+button.more-qs:hover{color:var(--accent);border-color:var(--accent)}
+</style>
+</head>
+<body>
+<main data-lavish-question="decision-matrix">
+  <p class="kicker">grill-me-lavish · decision matrix</p>
+  <h1 id="question"></h1>
+  <p class="context" id="context"></p>
+  <div class="rec"><b>Agent recommends</b> <span id="recommendation"></span></div>
+  <div class="scroll"><table id="matrix"></table></div>
+  <p class="legend">1 = poor · 5 = excellent. Cells start at the agent's ratings — correct the ones you disagree with.</p>
+  <div class="footer">
+    <p class="status" id="status">Rate every cell, then send.</p>
+    <button class="more-qs" id="moreQs" type="button" title="Tell the agent to go deeper on this topic">＋ More questions</button>
+    <button class="send" id="send">Send matrix to agent</button>
+  </div>
+</main>
+<script>
+const CONFIG = {
+  question: "Rate each option against each criterion",
+  context: "Totals are shown live, but the per-cell pattern (where each option wins or loses) is what the agent is really after.",
+  recommendation: "Option A overall — the pre-filled ratings reflect that.",
+  options: ["Option A", "Option B", "Option C"],
+  criteria: ["Fit", "Effort", "Risk"],
+  // prefill[option][criterion] = 1-5 or null to leave blank
+  prefill: {
+    "Option A": { Fit: 4, Effort: 4, Risk: 3 },
+    "Option B": { Fit: 3, Effort: 2, Risk: 4 },
+    "Option C": { Fit: 2, Effort: 5, Risk: 2 },
+  },
+};
+
+document.getElementById("question").textContent = CONFIG.question;
+document.getElementById("context").textContent = CONFIG.context;
+document.getElementById("recommendation").textContent = CONFIG.recommendation;
+
+const table = document.getElementById("matrix");
+const head = document.createElement("tr");
+head.innerHTML = '<th class="opt">Option</th>' + CONFIG.criteria.map(() => "<th></th>").join("") + "<th>Total</th>";
+CONFIG.criteria.forEach((c, i) => { head.children[i + 1].textContent = c; });
+table.appendChild(head);
+
+for (const opt of CONFIG.options) {
+  const tr = document.createElement("tr");
+  const tdOpt = document.createElement("td");
+  tdOpt.className = "opt";
+  tdOpt.textContent = opt;
+  tr.appendChild(tdOpt);
+  for (const crit of CONFIG.criteria) {
+    const td = document.createElement("td");
+    const seg = document.createElement("span");
+    seg.className = "seg";
+    const groupName = "r_" + opt + "_" + crit;
+    for (let v = 1; v <= 5; v++) {
+      const label = document.createElement("label");
+      const input = document.createElement("input");
+      input.type = "radio";
+      input.name = groupName;
+      input.value = v;
+      input.dataset.opt = opt;
+      input.dataset.crit = crit;
+      const pre = CONFIG.prefill?.[opt]?.[crit];
+      if (pre === v) input.checked = true;
+      label.appendChild(input);
+      label.appendChild(document.createTextNode(String(v)));
+      seg.appendChild(label);
+    }
+    td.appendChild(seg);
+    tr.appendChild(td);
+  }
+  const tdTotal = document.createElement("td");
+  tdTotal.className = "total";
+  tdTotal.dataset.opt = opt;
+  tr.appendChild(tdTotal);
+  table.appendChild(tr);
+}
+
+function ratings() {
+  const out = {};
+  for (const opt of CONFIG.options) {
+    out[opt] = {};
+    for (const crit of CONFIG.criteria) {
+      const checked = table.querySelector('input[name="r_' + CSS.escape(opt) + "_" + CSS.escape(crit) + '"]:checked');
+      out[opt][crit] = checked ? Number(checked.value) : null;
+    }
+  }
+  return out;
+}
+function refresh() {
+  const r = ratings();
+  let complete = true, best = -1;
+  const totals = {};
+  for (const opt of CONFIG.options) {
+    const vals = Object.values(r[opt]);
+    if (vals.some((v) => v === null)) complete = false;
+    totals[opt] = vals.reduce((a, b) => a + (b || 0), 0);
+    best = Math.max(best, totals[opt]);
+  }
+  for (const td of table.querySelectorAll("td.total")) {
+    td.textContent = totals[td.dataset.opt];
+    td.classList.toggle("best", complete && totals[td.dataset.opt] === best);
+  }
+  document.getElementById("send").disabled = !complete;
+  return { ratings: r, totals };
+}
+table.addEventListener("change", refresh);
+refresh();
+
+function markSent(msg) {
+  const s = document.getElementById("status");
+  s.textContent = msg;
+  s.classList.add("sent");
+}
+document.getElementById("send").addEventListener("click", () => {
+  const { ratings: r, totals } = refresh();
+  const summary = "Decision matrix totals: " +
+    Object.entries(totals).sort((a, b) => b[1] - a[1]).map(([k, v]) => k + "=" + v).join(", ");
+  const data = { widget: "decision-matrix", question: CONFIG.question, ratings: r, totals };
+  if (!window.lavish) { console.log("[grill-me-lavish]", summary, data); markSent("No Lavish session — logged to console."); return; }
+  window.lavish.queuePrompt(summary, { tag: "grill-answer", text: summary, element: document.querySelector("main"), data });
+  window.lavish.sendQueuedPrompts();
+  markSent("Sent ✓ — adjust and send again if you change your mind; the agent uses the latest.");
+});
+
+document.getElementById("moreQs").addEventListener("click", () => {
+  const summary = "User pressed 'More questions' — offer additional, deeper questions on this topic before moving on.";
+  const data = { widget: "meta", request: "more-questions", about: CONFIG.question };
+  if (!window.lavish) { console.log("[grill-me-lavish]", summary, data); markSent("No Lavish session — logged to console."); return; }
+  window.lavish.queuePrompt(summary, { tag: "grill-meta", text: "More questions requested", element: document.querySelector("main"), data });
+  window.lavish.sendQueuedPrompts();
+  markSent("Asked for more questions ✓ — the agent will dig deeper here.");
+});
+</script>
+</body>
+</html>

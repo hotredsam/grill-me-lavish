@@ -1,0 +1,141 @@
+<!doctype html>
+<!--
+  grill-me-lavish widget: confidence-slider
+  Decision type: a single answer PLUS how sure the user is about it. Low confidence
+  tells the agent exactly where to dig deeper; high confidence closes the branch.
+  The workhorse widget for ordinary single questions.
+  Emits (via window.lavish.queuePrompt options.data):
+    { widget: "confidence-slider", question: "...", answer: "chosen option",
+      confidence: 0-100, note: "optional free text" }
+  Adapt: edit the CONFIG block. Set CONFIG.recommendedAnswer to pre-select your pick.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>grill-me-lavish · Answer + confidence</title>
+<style>
+:root{--bg:#14161a;--card:#1d2026;--text:#e8eaed;--muted:#9aa0a6;--accent:#f4c95d;--border:#2c3038;--good:#7dc98f}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;display:flex;justify-content:center;padding:32px 16px}
+main{width:100%;max-width:680px}
+.kicker{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+h1{font-size:24px;margin:0 0 8px}
+.context{color:var(--muted);margin:0 0 16px}
+.rec{background:rgba(244,201,93,.08);border:1px solid rgba(244,201,93,.35);border-radius:10px;padding:10px 14px;margin:0 0 20px;font-size:14px}
+.rec b{color:var(--accent);font-weight:600;margin-right:6px}
+.opts label{display:flex;gap:12px;align-items:flex-start;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:8px;cursor:pointer}
+.opts label:has(input:checked){border-color:var(--accent);background:rgba(244,201,93,.06)}
+.opts input{accent-color:var(--accent);margin-top:4px}
+.opts .why{display:block;font-size:13px;color:var(--muted)}
+.conf{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-top:16px}
+.conf .top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
+.conf .val{font-weight:700;color:var(--accent);font-variant-numeric:tabular-nums}
+.conf input[type=range]{width:100%;accent-color:var(--accent)}
+.conf .scale{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:4px}
+textarea{width:100%;margin-top:16px;background:var(--card);border:1px solid var(--border);border-radius:12px;color:var(--text);font:14px/1.5 inherit;padding:12px;resize:vertical;min-height:60px}
+.footer{display:flex;align-items:center;gap:16px;margin-top:20px}
+.status{flex:1;font-size:13px;color:var(--muted);margin:0}
+.status.sent{color:var(--good)}
+button.send{background:var(--accent);color:#1a1a1a;border:0;border-radius:10px;padding:12px 20px;font-size:15px;font-weight:600;cursor:pointer}
+button.send:disabled{opacity:.4;cursor:not-allowed}
+button.more-qs{background:none;border:1px dashed var(--border);color:var(--muted);border-radius:50px;padding:10px 16px;font-size:13px;cursor:pointer}
+button.more-qs:hover{color:var(--accent);border-color:var(--accent)}
+</style>
+</head>
+<body>
+<main data-lavish-question="confidence-slider">
+  <p class="kicker">grill-me-lavish · answer + confidence</p>
+  <h1 id="question"></h1>
+  <p class="context" id="context"></p>
+  <div class="rec"><b>Agent recommends</b> <span id="recommendation"></span></div>
+  <div class="opts" id="opts"></div>
+  <div class="conf">
+    <div class="top"><span>How sure are you?</span><span class="val" id="confVal">60%</span></div>
+    <input type="range" id="conf" min="0" max="100" step="5" value="60">
+    <div class="scale"><span>Coin flip — dig deeper</span><span>Certain — close this branch</span></div>
+  </div>
+  <textarea id="note" placeholder="Optional: what would change your mind, or what you're unsure about"></textarea>
+  <div class="footer">
+    <p class="status" id="status">Pick an answer, set your confidence, then send.</p>
+    <button class="more-qs" id="moreQs" type="button" title="Tell the agent to go deeper on this topic">＋ More questions</button>
+    <button class="send" id="send" disabled>Send answer to agent</button>
+  </div>
+</main>
+<script>
+const CONFIG = {
+  question: "Which approach should we take?",
+  context: "The confidence slider matters as much as the answer — a 30% answer tells the agent to keep grilling this branch.",
+  recommendation: "Approach A — pre-selected below.",
+  options: [
+    { label: "Approach A", why: "Why the agent thinks this fits" },
+    { label: "Approach B", why: "The main alternative" },
+    { label: "Neither — I'll explain in the note", why: "" },
+  ],
+  recommendedAnswer: "Approach A",
+};
+
+document.getElementById("question").textContent = CONFIG.question;
+document.getElementById("context").textContent = CONFIG.context;
+document.getElementById("recommendation").textContent = CONFIG.recommendation;
+
+const opts = document.getElementById("opts");
+for (const o of CONFIG.options) {
+  const label = document.createElement("label");
+  const input = document.createElement("input");
+  input.type = "radio";
+  input.name = "answer";
+  input.value = o.label;
+  if (o.label === CONFIG.recommendedAnswer) input.checked = true;
+  const span = document.createElement("span");
+  const b = document.createElement("b");
+  b.textContent = o.label;
+  span.appendChild(b);
+  if (o.why) {
+    const why = document.createElement("span");
+    why.className = "why";
+    why.textContent = o.why;
+    span.appendChild(why);
+  }
+  label.appendChild(input);
+  label.appendChild(span);
+  opts.appendChild(label);
+}
+
+const conf = document.getElementById("conf");
+function refresh() {
+  document.getElementById("confVal").textContent = conf.value + "%";
+  document.getElementById("send").disabled = !opts.querySelector("input:checked");
+}
+conf.addEventListener("input", refresh);
+opts.addEventListener("change", refresh);
+refresh();
+
+function markSent(msg) {
+  const s = document.getElementById("status");
+  s.textContent = msg;
+  s.classList.add("sent");
+}
+document.getElementById("send").addEventListener("click", () => {
+  const answer = opts.querySelector("input:checked").value;
+  const confidence = Number(conf.value);
+  const note = document.getElementById("note").value.trim();
+  const summary = "Answer: " + answer + " (confidence " + confidence + "%)" + (note ? " — note: " + note : "");
+  const data = { widget: "confidence-slider", question: CONFIG.question, answer, confidence, note };
+  if (!window.lavish) { console.log("[grill-me-lavish]", summary, data); markSent("No Lavish session — logged to console."); return; }
+  window.lavish.queuePrompt(summary, { tag: "grill-answer", text: summary, element: document.querySelector("main"), data });
+  window.lavish.sendQueuedPrompts();
+  markSent("Sent ✓ — adjust and send again if you change your mind; the agent uses the latest.");
+});
+
+document.getElementById("moreQs").addEventListener("click", () => {
+  const summary = "User pressed 'More questions' — offer additional, deeper questions on this topic before moving on.";
+  const data = { widget: "meta", request: "more-questions", about: CONFIG.question };
+  if (!window.lavish) { console.log("[grill-me-lavish]", summary, data); markSent("No Lavish session — logged to console."); return; }
+  window.lavish.queuePrompt(summary, { tag: "grill-meta", text: "More questions requested", element: document.querySelector("main"), data });
+  window.lavish.sendQueuedPrompts();
+  markSent("Asked for more questions ✓ — the agent will dig deeper here.");
+});
+</script>
+</body>
+</html>

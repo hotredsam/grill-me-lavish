@@ -1,0 +1,166 @@
+<!doctype html>
+<!--
+  grill-me-lavish widget: pairwise
+  Decision type: true preference via forced this-vs-that choices. People rate
+  everything "important" on a scale; head-to-head duels expose the real ordering.
+  Shows every pair once (n items -> n*(n-1)/2 duels); a derived ranking comes from
+  win counts (Copeland score).
+  Emits (via window.lavish.queuePrompt options.data):
+    { widget: "pairwise", question: "...",
+      choices: [ { a, b, winner } ],
+      wins: { "Item": count, ... },
+      derivedRanking: ["most preferred", ...] }
+  Adapt: edit the CONFIG block. State your predicted winner in `recommendation`.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>grill-me-lavish · Pairwise choices</title>
+<style>
+:root{--bg:#14161a;--card:#1d2026;--text:#e8eaed;--muted:#9aa0a6;--accent:#f4c95d;--border:#2c3038;--good:#7dc98f}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;display:flex;justify-content:center;padding:32px 16px}
+main{width:100%;max-width:680px}
+.kicker{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+h1{font-size:24px;margin:0 0 8px}
+.context{color:var(--muted);margin:0 0 16px}
+.rec{background:rgba(244,201,93,.08);border:1px solid rgba(244,201,93,.35);border-radius:10px;padding:10px 14px;margin:0 0 20px;font-size:14px}
+.rec b{color:var(--accent);font-weight:600;margin-right:6px}
+.progress{font-size:13px;color:var(--muted);margin:0 0 12px;font-variant-numeric:tabular-nums}
+.duel{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:12px;align-items:stretch}
+.duel button{background:var(--card);border:1px solid var(--border);border-radius:14px;color:var(--text);font-size:17px;font-weight:600;padding:28px 16px;cursor:pointer;min-width:0;overflow-wrap:break-word}
+.duel button:hover{border-color:var(--accent)}
+.vs{display:flex;align-items:center;color:var(--muted);font-size:13px}
+.result{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;display:none}
+.result ol{margin:8px 0 0;padding-left:22px}
+.result li{margin-bottom:4px}
+.result .w{color:var(--muted);font-size:13px}
+.redo{background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:6px 12px;font-size:13px;cursor:pointer;margin-top:12px}
+.footer{display:flex;align-items:center;gap:16px;margin-top:20px}
+.status{flex:1;font-size:13px;color:var(--muted);margin:0}
+.status.sent{color:var(--good)}
+button.send{background:var(--accent);color:#1a1a1a;border:0;border-radius:10px;padding:12px 20px;font-size:15px;font-weight:600;cursor:pointer}
+button.send:disabled{opacity:.4;cursor:not-allowed}
+button.more-qs{background:none;border:1px dashed var(--border);color:var(--muted);border-radius:50px;padding:10px 16px;font-size:13px;cursor:pointer}
+button.more-qs:hover{color:var(--accent);border-color:var(--accent)}
+</style>
+</head>
+<body>
+<main data-lavish-question="pairwise">
+  <p class="kicker">grill-me-lavish · pairwise forced choice</p>
+  <h1 id="question"></h1>
+  <p class="context" id="context"></p>
+  <div class="rec"><b>Agent predicts</b> <span id="recommendation"></span></div>
+  <p class="progress" id="progress"></p>
+  <div class="duel" id="duel">
+    <button type="button" id="btnA"></button>
+    <span class="vs">vs</span>
+    <button type="button" id="btnB"></button>
+  </div>
+  <div class="result" id="result">
+    <b>Your derived ranking</b>
+    <ol id="rankList"></ol>
+    <button type="button" class="redo" id="redo">Redo the duels</button>
+  </div>
+  <div class="footer">
+    <p class="status" id="status">Pick the one you'd choose if you could only have one.</p>
+    <button class="more-qs" id="moreQs" type="button" title="Tell the agent to go deeper on this topic">＋ More questions</button>
+    <button class="send" id="send" disabled>Send choices to agent</button>
+  </div>
+</main>
+<script>
+const CONFIG = {
+  question: "If you could only have one, which?",
+  context: "Each duel is a forced choice — no \"both matter\". Win counts produce your real ranking.",
+  recommendation: "I predict Correctness comes out on top.",
+  items: ["Correctness", "Speed of delivery", "Performance", "Polish"],
+};
+
+document.getElementById("question").textContent = CONFIG.question;
+document.getElementById("context").textContent = CONFIG.context;
+document.getElementById("recommendation").textContent = CONFIG.recommendation;
+
+const pairs = [];
+for (let i = 0; i < CONFIG.items.length; i++)
+  for (let j = i + 1; j < CONFIG.items.length; j++)
+    pairs.push([CONFIG.items[i], CONFIG.items[j]]);
+
+let idx = 0;
+const choices = [];
+const duel = document.getElementById("duel");
+const result = document.getElementById("result");
+const btnA = document.getElementById("btnA");
+const btnB = document.getElementById("btnB");
+
+function show() {
+  const done = idx >= pairs.length;
+  duel.style.display = done ? "none" : "grid";
+  result.style.display = done ? "block" : "none";
+  document.getElementById("send").disabled = !done;
+  document.getElementById("progress").textContent = done
+    ? "All " + pairs.length + " duels done."
+    : "Duel " + (idx + 1) + " of " + pairs.length;
+  if (!done) {
+    btnA.textContent = pairs[idx][0];
+    btnB.textContent = pairs[idx][1];
+  } else {
+    const { wins, ranking } = tally();
+    const ol = document.getElementById("rankList");
+    ol.innerHTML = "";
+    for (const item of ranking) {
+      const li = document.createElement("li");
+      li.textContent = item + " ";
+      const w = document.createElement("span");
+      w.className = "w";
+      w.textContent = "(" + wins[item] + " win" + (wins[item] === 1 ? "" : "s") + ")";
+      li.appendChild(w);
+      ol.appendChild(li);
+    }
+  }
+}
+function tally() {
+  const wins = Object.fromEntries(CONFIG.items.map((i) => [i, 0]));
+  for (const c of choices) wins[c.winner]++;
+  const ranking = [...CONFIG.items].sort((a, b) => wins[b] - wins[a]);
+  return { wins, ranking };
+}
+function pick(winner) {
+  const [a, b] = pairs[idx];
+  choices.push({ a, b, winner });
+  idx++;
+  show();
+}
+btnA.addEventListener("click", () => pick(pairs[idx][0]));
+btnB.addEventListener("click", () => pick(pairs[idx][1]));
+document.getElementById("redo").addEventListener("click", () => {
+  idx = 0; choices.length = 0; show();
+});
+show();
+
+function markSent(msg) {
+  const s = document.getElementById("status");
+  s.textContent = msg;
+  s.classList.add("sent");
+}
+document.getElementById("send").addEventListener("click", () => {
+  const { wins, ranking } = tally();
+  const summary = "Pairwise result — derived ranking: " + ranking.join(" > ");
+  const data = { widget: "pairwise", question: CONFIG.question, choices, wins, derivedRanking: ranking };
+  if (!window.lavish) { console.log("[grill-me-lavish]", summary, data); markSent("No Lavish session — logged to console."); return; }
+  window.lavish.queuePrompt(summary, { tag: "grill-answer", text: summary, element: document.querySelector("main"), data });
+  window.lavish.sendQueuedPrompts();
+  markSent("Sent ✓ — redo the duels and send again if you change your mind; the agent uses the latest.");
+});
+
+document.getElementById("moreQs").addEventListener("click", () => {
+  const summary = "User pressed 'More questions' — offer additional, deeper questions on this topic before moving on.";
+  const data = { widget: "meta", request: "more-questions", about: CONFIG.question };
+  if (!window.lavish) { console.log("[grill-me-lavish]", summary, data); markSent("No Lavish session — logged to console."); return; }
+  window.lavish.queuePrompt(summary, { tag: "grill-meta", text: "More questions requested", element: document.querySelector("main"), data });
+  window.lavish.sendQueuedPrompts();
+  markSent("Asked for more questions ✓ — the agent will dig deeper here.");
+});
+</script>
+</body>
+</html>

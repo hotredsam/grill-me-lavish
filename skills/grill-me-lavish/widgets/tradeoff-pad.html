@@ -1,0 +1,165 @@
+<!doctype html>
+<!--
+  grill-me-lavish widget: tradeoff-pad
+  Decision type: position on two competing axes at once (e.g. speed vs robustness,
+  cost vs quality). A dot on a 2D pad captures a nuanced stance a 1D slider cannot.
+  Supports one or more named markers (e.g. place both "MVP" and "V2").
+  Emits (via window.lavish.queuePrompt options.data):
+    { widget: "tradeoff-pad", question: "...",
+      axes: { x: {label, low, high}, y: {label, low, high} },
+      markers: [ { name, x: 0-100, y: 0-100 } ] }   // x: 0=low..100=high, y: 0=low..100=high
+  Adapt: edit the CONFIG block. Set each marker's start position to your recommendation.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>grill-me-lavish · Tradeoff pad</title>
+<style>
+:root{--bg:#14161a;--card:#1d2026;--text:#e8eaed;--muted:#9aa0a6;--accent:#f4c95d;--border:#2c3038;--good:#7dc98f}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;display:flex;justify-content:center;padding:32px 16px}
+main{width:100%;max-width:680px}
+.kicker{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+h1{font-size:24px;margin:0 0 8px}
+.context{color:var(--muted);margin:0 0 16px}
+.rec{background:rgba(244,201,93,.08);border:1px solid rgba(244,201,93,.35);border-radius:10px;padding:10px 14px;margin:0 0 20px;font-size:14px}
+.rec b{color:var(--accent);font-weight:600;margin-right:6px}
+.pad-wrap{display:grid;grid-template-columns:28px minmax(0,1fr);grid-template-rows:minmax(0,1fr) 28px;gap:4px}
+.y-label{writing-mode:vertical-rl;transform:rotate(180deg);display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--muted)}
+.x-label{grid-column:2;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--muted)}
+.pad{position:relative;aspect-ratio:4/3;background:var(--card);border:1px solid var(--border);border-radius:12px;cursor:crosshair;touch-action:none;background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);background-size:25% 25%}
+.pad .end{position:absolute;font-size:11px;color:var(--muted);pointer-events:none;padding:4px 6px}
+.pad .end.left{left:0;top:50%;transform:translateY(-50%)}
+.pad .end.right{right:0;top:50%;transform:translateY(-50%)}
+.pad .end.top{top:0;left:50%;transform:translateX(-50%)}
+.pad .end.bottom{bottom:0;left:50%;transform:translateX(-50%)}
+.dot{position:absolute;width:18px;height:18px;border-radius:50%;background:var(--accent);border:2px solid #1a1a1a;transform:translate(-50%,-50%);cursor:grab}
+.dot .tag{position:absolute;top:-22px;left:50%;transform:translateX(-50%);font-size:11px;background:#000a;color:var(--text);padding:1px 6px;border-radius:6px;white-space:nowrap}
+.readout{font-size:13px;color:var(--muted);margin:10px 0 0;font-variant-numeric:tabular-nums}
+.footer{display:flex;align-items:center;gap:16px;margin-top:20px}
+.status{flex:1;font-size:13px;color:var(--muted);margin:0}
+.status.sent{color:var(--good)}
+button.send{background:var(--accent);color:#1a1a1a;border:0;border-radius:10px;padding:12px 20px;font-size:15px;font-weight:600;cursor:pointer}
+button.more-qs{background:none;border:1px dashed var(--border);color:var(--muted);border-radius:50px;padding:10px 16px;font-size:13px;cursor:pointer}
+button.more-qs:hover{color:var(--accent);border-color:var(--accent)}
+</style>
+</head>
+<body>
+<main data-lavish-question="tradeoff-pad">
+  <p class="kicker">grill-me-lavish · 2-axis tradeoff</p>
+  <h1 id="question"></h1>
+  <p class="context" id="context"></p>
+  <div class="rec"><b>Agent recommends</b> <span id="recommendation"></span></div>
+  <div class="pad-wrap">
+    <div class="y-label" id="ylabel"></div>
+    <div class="pad" id="pad" data-lavish-action="place-marker">
+      <span class="end left" id="xlow"></span><span class="end right" id="xhigh"></span>
+      <span class="end bottom" id="ylow"></span><span class="end top" id="yhigh"></span>
+    </div>
+    <div></div>
+    <div class="x-label" id="xlabel"></div>
+  </div>
+  <p class="readout" id="readout"></p>
+  <div class="footer">
+    <p class="status" id="status">Drag each dot to where you actually stand, then send.</p>
+    <button class="more-qs" id="moreQs" type="button" title="Tell the agent to go deeper on this topic">＋ More questions</button>
+    <button class="send" id="send">Send positions to agent</button>
+  </div>
+</main>
+<script>
+const CONFIG = {
+  question: "Where should this land on speed vs robustness?",
+  context: "Drag the dot. Corners are legitimate answers; so is the ambivalent middle.",
+  recommendation: "Ship-fast leaning but not reckless — the dot's starting position.",
+  axes: {
+    x: { label: "Delivery speed", low: "Take our time", high: "Ship ASAP" },
+    y: { label: "Robustness", low: "Prototype-grade", high: "Production-grade" },
+  },
+  markers: [ { name: "Your position", x: 65, y: 45 } ],
+};
+
+document.getElementById("question").textContent = CONFIG.question;
+document.getElementById("context").textContent = CONFIG.context;
+document.getElementById("recommendation").textContent = CONFIG.recommendation;
+document.getElementById("xlabel").textContent = CONFIG.axes.x.label + " →";
+document.getElementById("ylabel").textContent = CONFIG.axes.y.label + " →";
+document.getElementById("xlow").textContent = CONFIG.axes.x.low;
+document.getElementById("xhigh").textContent = CONFIG.axes.x.high;
+document.getElementById("ylow").textContent = CONFIG.axes.y.low;
+document.getElementById("yhigh").textContent = CONFIG.axes.y.high;
+
+const pad = document.getElementById("pad");
+const markers = CONFIG.markers.map((m) => ({ ...m }));
+for (const m of markers) {
+  const dot = document.createElement("div");
+  dot.className = "dot";
+  dot.setAttribute("data-lavish-action", "drag-marker");
+  if (markers.length > 1 || m.name !== "Your position") {
+    const tag = document.createElement("span");
+    tag.className = "tag";
+    tag.textContent = m.name;
+    dot.appendChild(tag);
+  }
+  m.el = dot;
+  pad.appendChild(dot);
+}
+function place(m) {
+  m.el.style.left = m.x + "%";
+  m.el.style.top = (100 - m.y) + "%";
+}
+function readout() {
+  document.getElementById("readout").textContent = markers
+    .map((m) => m.name + ": " + CONFIG.axes.x.label + " " + m.x + "/100, " + CONFIG.axes.y.label + " " + m.y + "/100")
+    .join(" · ");
+}
+markers.forEach(place);
+readout();
+
+let active = null;
+function moveTo(m, clientX, clientY) {
+  const r = pad.getBoundingClientRect();
+  m.x = Math.round(Math.min(100, Math.max(0, ((clientX - r.left) / r.width) * 100)));
+  m.y = Math.round(Math.min(100, Math.max(0, (1 - (clientY - r.top) / r.height) * 100)));
+  place(m); readout();
+}
+pad.addEventListener("pointerdown", (e) => {
+  const hit = markers.find((m) => m.el === e.target || m.el.contains(e.target));
+  active = hit || markers[0];
+  pad.setPointerCapture(e.pointerId);
+  moveTo(active, e.clientX, e.clientY);
+});
+pad.addEventListener("pointermove", (e) => { if (active) moveTo(active, e.clientX, e.clientY); });
+pad.addEventListener("pointerup", () => { active = null; });
+
+function markSent(msg) {
+  const s = document.getElementById("status");
+  s.textContent = msg;
+  s.classList.add("sent");
+}
+document.getElementById("send").addEventListener("click", () => {
+  const out = markers.map(({ name, x, y }) => ({ name, x, y }));
+  const summary = "Tradeoff positions — " + out
+    .map((m) => m.name + ": " + CONFIG.axes.x.label + "=" + m.x + "/100, " + CONFIG.axes.y.label + "=" + m.y + "/100")
+    .join("; ");
+  const data = {
+    widget: "tradeoff-pad", question: CONFIG.question,
+    axes: { x: CONFIG.axes.x, y: CONFIG.axes.y }, markers: out,
+  };
+  if (!window.lavish) { console.log("[grill-me-lavish]", summary, data); markSent("No Lavish session — logged to console."); return; }
+  window.lavish.queuePrompt(summary, { tag: "grill-answer", text: summary, element: document.querySelector("main"), data });
+  window.lavish.sendQueuedPrompts();
+  markSent("Sent ✓ — move the dot and send again if you change your mind; the agent uses the latest.");
+});
+
+document.getElementById("moreQs").addEventListener("click", () => {
+  const summary = "User pressed 'More questions' — offer additional, deeper questions on this topic before moving on.";
+  const data = { widget: "meta", request: "more-questions", about: CONFIG.question };
+  if (!window.lavish) { console.log("[grill-me-lavish]", summary, data); markSent("No Lavish session — logged to console."); return; }
+  window.lavish.queuePrompt(summary, { tag: "grill-meta", text: "More questions requested", element: document.querySelector("main"), data });
+  window.lavish.sendQueuedPrompts();
+  markSent("Asked for more questions ✓ — the agent will dig deeper here.");
+});
+</script>
+</body>
+</html>

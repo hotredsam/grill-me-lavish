@@ -1,0 +1,141 @@
+<!doctype html>
+<!--
+  grill-me-lavish widget: drag-rank
+  Decision type: relative priority among N items — the ordering reveals relative weight.
+  Emits (via window.lavish.queuePrompt options.data):
+    { widget: "drag-rank", question: "...", ranking: ["highest priority", ..., "lowest"] }
+  Adapt: edit the CONFIG block. Pre-order CONFIG.items to your recommended ranking.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>grill-me-lavish · Rank priorities</title>
+<style>
+:root{--bg:#14161a;--card:#1d2026;--text:#e8eaed;--muted:#9aa0a6;--accent:#f4c95d;--border:#2c3038;--good:#7dc98f}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;display:flex;justify-content:center;padding:32px 16px}
+main{width:100%;max-width:680px}
+.kicker{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+h1{font-size:24px;margin:0 0 8px}
+.context{color:var(--muted);margin:0 0 16px}
+.rec{background:rgba(244,201,93,.08);border:1px solid rgba(244,201,93,.35);border-radius:10px;padding:10px 14px;margin:0 0 20px;font-size:14px}
+.rec b{color:var(--accent);font-weight:600;margin-right:6px}
+ol{list-style:none;margin:0;padding:0}
+li{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px 16px;margin-bottom:8px;cursor:grab}
+li.dragging{opacity:.4}
+li .pos{width:26px;height:26px;border-radius:50%;background:rgba(244,201,93,.15);color:var(--accent);font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+li .label{flex:1;min-width:0}
+li .grip{color:var(--muted);letter-spacing:2px;user-select:none}
+li .nudge{display:flex;flex-direction:column;gap:2px}
+li .nudge button{background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;width:24px;height:20px;font-size:10px;line-height:1;cursor:pointer;padding:0}
+li .nudge button:hover{color:var(--text);border-color:var(--muted)}
+.hint{font-size:13px;color:var(--muted);margin:4px 0 0}
+.footer{display:flex;align-items:center;gap:16px;margin-top:20px}
+.status{flex:1;font-size:13px;color:var(--muted);margin:0}
+.status.sent{color:var(--good)}
+button.send{background:var(--accent);color:#1a1a1a;border:0;border-radius:10px;padding:12px 20px;font-size:15px;font-weight:600;cursor:pointer}
+button.more-qs{background:none;border:1px dashed var(--border);color:var(--muted);border-radius:50px;padding:10px 16px;font-size:13px;cursor:pointer}
+button.more-qs:hover{color:var(--accent);border-color:var(--accent)}
+</style>
+</head>
+<body>
+<main data-lavish-question="drag-rank">
+  <p class="kicker">grill-me-lavish · drag to rank</p>
+  <h1 id="question"></h1>
+  <p class="context" id="context"></p>
+  <div class="rec"><b>Agent recommends</b> <span id="recommendation"></span></div>
+  <ol id="list"></ol>
+  <p class="hint">Drag items (or use ▲▼) — top = highest priority. The list starts in the agent's recommended order.</p>
+  <div class="footer">
+    <p class="status" id="status">Reorder, then send.</p>
+    <button class="more-qs" id="moreQs" type="button" title="Tell the agent to go deeper on this topic">＋ More questions</button>
+    <button class="send" id="send">Send ranking to agent</button>
+  </div>
+</main>
+<script>
+const CONFIG = {
+  question: "Rank these priorities for the project",
+  context: "Top matters most. Your ordering tells the agent the relative weight of each concern.",
+  recommendation: "The order shown below — correctness first, then speed of delivery.",
+  items: ["Correctness", "Speed of delivery", "Performance", "Polish"],
+};
+
+document.getElementById("question").textContent = CONFIG.question;
+document.getElementById("context").textContent = CONFIG.context;
+document.getElementById("recommendation").textContent = CONFIG.recommendation;
+
+const list = document.getElementById("list");
+for (const item of CONFIG.items) {
+  const li = document.createElement("li");
+  li.draggable = true;
+  li.setAttribute("data-lavish-action", "reorder");
+  li.dataset.value = item;
+  li.innerHTML = '<span class="pos"></span><span class="label"></span>' +
+    '<span class="nudge"><button type="button" data-dir="-1" aria-label="move up">▲</button>' +
+    '<button type="button" data-dir="1" aria-label="move down">▼</button></span><span class="grip">⋮⋮</span>';
+  li.querySelector(".label").textContent = item;
+  list.appendChild(li);
+}
+
+function renumber() {
+  [...list.children].forEach((li, i) => { li.querySelector(".pos").textContent = i + 1; });
+}
+renumber();
+
+let dragged = null;
+list.addEventListener("dragstart", (e) => {
+  dragged = e.target.closest("li");
+  dragged.classList.add("dragging");
+  e.dataTransfer.effectAllowed = "move";
+  e.dataTransfer.setData("text/plain", "");
+});
+list.addEventListener("dragend", () => {
+  if (dragged) dragged.classList.remove("dragging");
+  dragged = null;
+  renumber();
+});
+list.addEventListener("dragover", (e) => {
+  e.preventDefault();
+  const over = e.target.closest("li");
+  if (!over || over === dragged || !dragged) return;
+  const rect = over.getBoundingClientRect();
+  const before = e.clientY < rect.top + rect.height / 2;
+  list.insertBefore(dragged, before ? over : over.nextSibling);
+});
+list.addEventListener("click", (e) => {
+  const btn = e.target.closest("button[data-dir]");
+  if (!btn) return;
+  const li = btn.closest("li");
+  const dir = Number(btn.dataset.dir);
+  if (dir < 0 && li.previousElementSibling) list.insertBefore(li, li.previousElementSibling);
+  if (dir > 0 && li.nextElementSibling) list.insertBefore(li.nextElementSibling, li);
+  renumber();
+});
+
+function markSent(msg) {
+  const s = document.getElementById("status");
+  s.textContent = msg;
+  s.classList.add("sent");
+}
+document.getElementById("send").addEventListener("click", () => {
+  const ranking = [...list.children].map((li) => li.dataset.value);
+  const summary = "Ranking (highest priority first): " + ranking.join(" > ");
+  const data = { widget: "drag-rank", question: CONFIG.question, ranking };
+  if (!window.lavish) { console.log("[grill-me-lavish]", summary, data); markSent("No Lavish session — logged to console."); return; }
+  window.lavish.queuePrompt(summary, { tag: "grill-answer", text: summary, element: document.querySelector("main"), data });
+  window.lavish.sendQueuedPrompts();
+  markSent("Sent ✓ — reorder and send again if you change your mind; the agent uses the latest.");
+});
+
+document.getElementById("moreQs").addEventListener("click", () => {
+  const summary = "User pressed 'More questions' — offer additional, deeper questions on this topic before moving on.";
+  const data = { widget: "meta", request: "more-questions", about: CONFIG.question };
+  if (!window.lavish) { console.log("[grill-me-lavish]", summary, data); markSent("No Lavish session — logged to console."); return; }
+  window.lavish.queuePrompt(summary, { tag: "grill-meta", text: "More questions requested", element: document.querySelector("main"), data });
+  window.lavish.sendQueuedPrompts();
+  markSent("Asked for more questions ✓ — the agent will dig deeper here.");
+});
+</script>
+</body>
+</html>

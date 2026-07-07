@@ -1,0 +1,14 @@
+# Node
+node_modules/
+npm-debug.log*
+package-lock.json
+
+# Lavish / grill-me-lavish session artifacts
+.lavish-axi/
+.grill-me-lavish/
+.lavish/
+*.export.html
+
+# OS junk
+.DS_Store
+Thumbs.db

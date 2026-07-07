@@ -1,0 +1,227 @@
+<!doctype html>
+<!--
+  grill-me-lavish demo: three widgets on one page, for testing the round-trip.
+  NOTE: a real grill-me-lavish interview puts ONE decision per artifact. This demo
+  bundles three only to exercise the widget mechanics and the queue → send-all flow.
+  Each section queues its answer (replacing any prior unsent answer for that
+  section, via data-lavish-question); the bottom bar sends the whole queue.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>grill-me-lavish demo interview</title>
+<style>
+:root{--bg:#14161a;--card:#1d2026;--text:#e8eaed;--muted:#9aa0a6;--accent:#f4c95d;--border:#2c3038;--good:#7dc98f;--bad:#e07a7a}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;display:flex;justify-content:center;padding:32px 16px 96px}
+main{width:100%;max-width:680px}
+.kicker{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+h1{font-size:26px;margin:0 0 6px}
+.lede{color:var(--muted);margin:0 0 28px}
+section{border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:20px}
+section h2{font-size:18px;margin:0 0 4px}
+section .ctx{font-size:14px;color:var(--muted);margin:0 0 12px}
+.rec{background:rgba(244,201,93,.08);border:1px solid rgba(244,201,93,.35);border-radius:10px;padding:8px 12px;margin:0 0 14px;font-size:13px}
+.rec b{color:var(--accent);font-weight:600;margin-right:6px}
+button.queue{background:none;border:1px solid var(--accent);color:var(--accent);border-radius:9px;padding:8px 14px;font-size:14px;font-weight:600;cursor:pointer;margin-top:12px}
+button.queue:hover{background:rgba(244,201,93,.1)}
+.qstate{display:inline-block;margin-left:10px;font-size:13px;color:var(--good)}
+/* drag-rank */
+ol.rank{list-style:none;margin:0;padding:0}
+ol.rank li{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:6px;cursor:grab}
+ol.rank li.dragging{opacity:.4}
+ol.rank .pos{width:22px;height:22px;border-radius:50%;background:rgba(244,201,93,.15);color:var(--accent);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+ol.rank .label{flex:1;min-width:0}
+ol.rank .grip{color:var(--muted);letter-spacing:2px;user-select:none}
+/* pad */
+.pad{position:relative;aspect-ratio:2/1;background:var(--card);border:1px solid var(--border);border-radius:12px;cursor:crosshair;touch-action:none;background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);background-size:25% 50%}
+.pad .end{position:absolute;font-size:11px;color:var(--muted);pointer-events:none;padding:4px 6px}
+.pad .end.l{left:0;top:50%;transform:translateY(-50%)}.pad .end.r{right:0;top:50%;transform:translateY(-50%)}
+.pad .end.t{top:0;left:50%;transform:translateX(-50%)}.pad .end.b{bottom:0;left:50%;transform:translateX(-50%)}
+.dot{position:absolute;width:16px;height:16px;border-radius:50%;background:var(--accent);border:2px solid #1a1a1a;transform:translate(-50%,-50%)}
+.padout{font-size:13px;color:var(--muted);margin:8px 0 0;font-variant-numeric:tabular-nums}
+/* strawman */
+.verdicts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.verdicts label{display:block;text-align:center;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 8px;cursor:pointer;font-size:14px}
+.verdicts input{display:none}
+.verdicts label:has(input:checked){border-color:var(--accent);background:rgba(244,201,93,.08)}
+.proposal{background:var(--card);border-left:3px solid var(--accent);border-radius:8px;padding:10px 14px;font-size:14px;margin:0 0 12px}
+textarea{width:100%;margin-top:10px;background:var(--card);border:1px solid var(--border);border-radius:10px;color:var(--text);font:14px/1.5 inherit;padding:10px;resize:vertical;min-height:48px}
+/* send bar */
+.sendbar{position:fixed;left:0;right:0;bottom:0;background:rgba(20,22,26,.95);border-top:1px solid var(--border);padding:14px 16px;display:flex;justify-content:center}
+.sendbar .inner{width:100%;max-width:680px;display:flex;align-items:center;gap:16px}
+.sendbar .count{flex:1;font-size:13px;color:var(--muted)}
+.sendbar .count.ready{color:var(--good)}
+button.send{background:var(--accent);color:#1a1a1a;border:0;border-radius:10px;padding:12px 20px;font-size:15px;font-weight:600;cursor:pointer}
+button.send:disabled{opacity:.4;cursor:not-allowed}
+@media (max-width:520px){.verdicts{grid-template-columns:minmax(0,1fr)}}
+button.round-more{width:44px;height:44px;border-radius:50%;background:none;border:1px dashed var(--accent);color:var(--accent);font-size:22px;line-height:1;cursor:pointer;flex-shrink:0}
+button.round-more:hover{background:rgba(244,201,93,.12)}
+</style>
+</head>
+<body>
+<main>
+  <p class="kicker">grill-me-lavish · demo interview</p>
+  <h1>Round-trip test: three widgets</h1>
+  <p class="lede">Answer each section and press <b>Queue answer</b>, then send everything from the bar below. (A real interview shows one decision at a time.)</p>
+
+  <section data-lavish-question="demo-rank">
+    <h2>1 · Rank what matters in this skill</h2>
+    <p class="ctx">Drag to reorder — top is most important.</p>
+    <div class="rec"><b>Agent recommends</b> the order shown.</div>
+    <ol class="rank" id="rank"></ol>
+    <button type="button" class="queue" id="queueRank">Queue answer</button><span class="qstate" id="stateRank"></span>
+  </section>
+
+  <section data-lavish-question="demo-pad">
+    <h2>2 · Widget style tradeoff</h2>
+    <p class="ctx">Click or drag the dot: how should widgets balance visual richness against simplicity?</p>
+    <div class="rec"><b>Agent recommends</b> right-of-center on richness, upper half on polish — the dot's start.</div>
+    <div class="pad" id="pad" data-lavish-action="place-marker">
+      <span class="end l">Minimal</span><span class="end r">Rich</span>
+      <span class="end b">Rough ok</span><span class="end t">Polished</span>
+    </div>
+    <p class="padout" id="padout"></p>
+    <button type="button" class="queue" id="queuePad">Queue answer</button><span class="qstate" id="statePad"></span>
+  </section>
+
+  <section data-lavish-question="demo-strawman">
+    <h2>3 · Strawman: default artifact location</h2>
+    <p class="ctx">React to the agent's proposed default.</p>
+    <div class="proposal">Interview artifacts default to <code>.grill-me-lavish/</code> in the working directory, numbered in interview order.</div>
+    <div class="verdicts">
+      <label><input type="radio" name="verdict" value="accept">✅ Accept</label>
+      <label><input type="radio" name="verdict" value="tweak">✏️ Tweak</label>
+      <label><input type="radio" name="verdict" value="reject">❌ Reject</label>
+    </div>
+    <textarea id="reason" placeholder="Reason (required for tweak/reject)"></textarea>
+    <button type="button" class="queue" id="queueStraw">Queue answer</button><span class="qstate" id="stateStraw"></span>
+  </section>
+</main>
+
+<div class="sendbar"><div class="inner">
+  <span class="count" id="count">Nothing queued yet.</span>
+  <button class="round-more" id="moreRound" type="button" title="Ask the agent for more questions">＋</button>
+  <button class="send" id="sendAll" disabled>Send all answers to agent</button>
+</div></div>
+
+<script>
+const queued = {};
+function lavishQueue(sectionId, summary, data, el) {
+  if (window.lavish) {
+    window.lavish.queuePrompt(summary, { tag: "grill-answer", text: summary, element: el, data });
+  } else {
+    console.log("[grill-me-lavish demo]", summary, data);
+  }
+  queued[sectionId] = true;
+  document.getElementById("state" + sectionId).textContent = "queued ✓ (re-queue replaces it)";
+  const n = Object.keys(queued).length;
+  const count = document.getElementById("count");
+  count.textContent = n + " of 3 answers queued.";
+  count.classList.toggle("ready", n === 3);
+  document.getElementById("sendAll").disabled = n === 0;
+}
+
+// 1 · drag-rank
+const rankItems = ["Elicitation fidelity", "Speed per question", "Visual polish", "Works offline"];
+const rank = document.getElementById("rank");
+for (const item of rankItems) {
+  const li = document.createElement("li");
+  li.draggable = true;
+  li.setAttribute("data-lavish-action", "reorder");
+  li.dataset.value = item;
+  li.innerHTML = '<span class="pos"></span><span class="label"></span><span class="grip">⋮⋮</span>';
+  li.querySelector(".label").textContent = item;
+  rank.appendChild(li);
+}
+function renumber() { [...rank.children].forEach((li, i) => { li.querySelector(".pos").textContent = i + 1; }); }
+renumber();
+let dragged = null;
+rank.addEventListener("dragstart", (e) => { dragged = e.target.closest("li"); dragged.classList.add("dragging"); e.dataTransfer.setData("text/plain", ""); });
+rank.addEventListener("dragend", () => { if (dragged) dragged.classList.remove("dragging"); dragged = null; renumber(); });
+rank.addEventListener("dragover", (e) => {
+  e.preventDefault();
+  const over = e.target.closest("li");
+  if (!over || over === dragged || !dragged) return;
+  const r = over.getBoundingClientRect();
+  rank.insertBefore(dragged, e.clientY < r.top + r.height / 2 ? over : over.nextSibling);
+});
+document.getElementById("queueRank").addEventListener("click", (e) => {
+  const ranking = [...rank.children].map((li) => li.dataset.value);
+  lavishQueue("Rank", "Demo ranking: " + ranking.join(" > "),
+    { widget: "drag-rank", question: "Rank what matters in this skill", ranking },
+    e.target.closest("section"));
+});
+
+// 2 · tradeoff pad
+const pad = document.getElementById("pad");
+const dot = document.createElement("div");
+dot.className = "dot";
+dot.setAttribute("data-lavish-action", "drag-marker");
+pad.appendChild(dot);
+let padPos = { x: 65, y: 60 };
+function placeDot() {
+  dot.style.left = padPos.x + "%";
+  dot.style.top = (100 - padPos.y) + "%";
+  document.getElementById("padout").textContent = "Richness " + padPos.x + "/100 · Polish " + padPos.y + "/100";
+}
+placeDot();
+let padActive = false;
+function padMove(e) {
+  const r = pad.getBoundingClientRect();
+  padPos.x = Math.round(Math.min(100, Math.max(0, ((e.clientX - r.left) / r.width) * 100)));
+  padPos.y = Math.round(Math.min(100, Math.max(0, (1 - (e.clientY - r.top) / r.height) * 100)));
+  placeDot();
+}
+pad.addEventListener("pointerdown", (e) => { padActive = true; pad.setPointerCapture(e.pointerId); padMove(e); });
+pad.addEventListener("pointermove", (e) => { if (padActive) padMove(e); });
+pad.addEventListener("pointerup", () => { padActive = false; });
+document.getElementById("queuePad").addEventListener("click", (e) => {
+  lavishQueue("Pad", "Demo tradeoff: richness " + padPos.x + "/100, polish " + padPos.y + "/100",
+    { widget: "tradeoff-pad", question: "Widget style tradeoff",
+      axes: { x: { label: "Richness", low: "Minimal", high: "Rich" }, y: { label: "Polish", low: "Rough ok", high: "Polished" } },
+      markers: [{ name: "Your position", x: padPos.x, y: padPos.y }] },
+    e.target.closest("section"));
+});
+
+// 3 · strawman
+document.getElementById("queueStraw").addEventListener("click", (e) => {
+  const section = e.target.closest("section");
+  const checked = section.querySelector("input[name=verdict]:checked");
+  const reason = document.getElementById("reason").value.trim();
+  if (!checked) { document.getElementById("stateStraw").textContent = "pick a verdict first"; return; }
+  if ((checked.value === "tweak" || checked.value === "reject") && !reason) {
+    document.getElementById("stateStraw").textContent = "reason required for " + checked.value;
+    return;
+  }
+  lavishQueue("Straw", "Demo strawman verdict: " + checked.value + (reason ? " — " + reason : ""),
+    { widget: "strawman", question: "Default artifact location",
+      proposal: ".grill-me-lavish/ in the working directory, numbered", verdict: checked.value, reason },
+    section);
+});
+
+// send all
+document.getElementById("sendAll").addEventListener("click", () => {
+  if (window.lavish) window.lavish.sendQueuedPrompts();
+  else console.log("[grill-me-lavish demo] sendQueuedPrompts (no SDK)");
+  const count = document.getElementById("count");
+  count.textContent = "Sent ✓ — the agent's poll should return your structured answers.";
+  count.classList.add("ready");
+});
+
+// round + button: ask the agent for another round of questions
+document.getElementById("moreRound").addEventListener("click", () => {
+  const summary = "User pressed the round + button — pull up an additional round of questions.";
+  const data = { widget: "meta", request: "more-questions" };
+  if (window.lavish) {
+    window.lavish.queuePrompt(summary, { tag: "grill-meta", text: "More questions requested", element: document.querySelector(".sendbar"), data });
+    window.lavish.sendQueuedPrompts();
+  } else console.log("[grill-me-lavish demo]", summary, data);
+  const count = document.getElementById("count");
+  count.textContent = "Asked for more questions ✓";
+  count.classList.add("ready");
+});
+</script>
+</body>
+</html>

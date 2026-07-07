@@ -1,0 +1,164 @@
+<!doctype html>
+<!--
+  grill-me-lavish widget: moscow-buckets
+  Decision type: scope triage — sort items into must-have / nice-to-have / won't-do.
+  Ordering within a bucket doesn't matter; membership does. Great for cutting scope
+  and surfacing unstated non-goals.
+  Emits (via window.lavish.queuePrompt options.data):
+    { widget: "moscow-buckets", question: "...",
+      buckets: { must: [...], nice: [...], wont: [...] } }
+  Adapt: edit the CONFIG block. Pre-place items per your recommended triage
+  (CONFIG.start maps item -> "must" | "nice" | "wont").
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>grill-me-lavish · Scope triage</title>
+<style>
+:root{--bg:#14161a;--card:#1d2026;--text:#e8eaed;--muted:#9aa0a6;--accent:#f4c95d;--border:#2c3038;--good:#7dc98f;--bad:#e07a7a}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;display:flex;justify-content:center;padding:32px 16px}
+main{width:100%;max-width:820px}
+.kicker{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+h1{font-size:24px;margin:0 0 8px}
+.context{color:var(--muted);margin:0 0 16px}
+.rec{background:rgba(244,201,93,.08);border:1px solid rgba(244,201,93,.35);border-radius:10px;padding:10px 14px;margin:0 0 20px;font-size:14px}
+.rec b{color:var(--accent);font-weight:600;margin-right:6px}
+.buckets{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.bucket{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px;min-height:180px}
+.bucket.dragover{border-color:var(--accent)}
+.bucket h2{font-size:14px;margin:0 0 10px;display:flex;align-items:center;gap:8px}
+.bucket .dotc{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.bucket[data-bucket=must] .dotc{background:var(--good)}
+.bucket[data-bucket=nice] .dotc{background:var(--accent)}
+.bucket[data-bucket=wont] .dotc{background:var(--bad)}
+.bucket .sub{font-size:11px;color:var(--muted);font-weight:400;margin-left:auto}
+.item{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:9px 12px;margin-bottom:6px;font-size:14px;cursor:grab;overflow-wrap:break-word}
+.item.dragging{opacity:.4}
+.item .cyc{float:right;color:var(--muted);font-size:12px;margin-left:8px;user-select:none}
+.hint{font-size:13px;color:var(--muted);margin:10px 0 0}
+.footer{display:flex;align-items:center;gap:16px;margin-top:20px}
+.status{flex:1;font-size:13px;color:var(--muted);margin:0}
+.status.sent{color:var(--good)}
+button.send{background:var(--accent);color:#1a1a1a;border:0;border-radius:10px;padding:12px 20px;font-size:15px;font-weight:600;cursor:pointer}
+@media (max-width:640px){.buckets{grid-template-columns:minmax(0,1fr)}}
+button.more-qs{background:none;border:1px dashed var(--border);color:var(--muted);border-radius:50px;padding:10px 16px;font-size:13px;cursor:pointer}
+button.more-qs:hover{color:var(--accent);border-color:var(--accent)}
+</style>
+</head>
+<body>
+<main data-lavish-question="moscow-buckets">
+  <p class="kicker">grill-me-lavish · must / nice / won't</p>
+  <h1 id="question"></h1>
+  <p class="context" id="context"></p>
+  <div class="rec"><b>Agent recommends</b> <span id="recommendation"></span></div>
+  <div class="buckets">
+    <div class="bucket" data-bucket="must"><h2><span class="dotc"></span>Must-have<span class="sub">v1 fails without it</span></h2></div>
+    <div class="bucket" data-bucket="nice"><h2><span class="dotc"></span>Nice-to-have<span class="sub">if time allows</span></h2></div>
+    <div class="bucket" data-bucket="wont"><h2><span class="dotc"></span>Won't-do<span class="sub">explicit non-goal</span></h2></div>
+  </div>
+  <p class="hint">Drag items between buckets, or tap ⇄ to cycle. Items start where the agent would put them.</p>
+  <div class="footer">
+    <p class="status" id="status">Triage everything, then send.</p>
+    <button class="more-qs" id="moreQs" type="button" title="Tell the agent to go deeper on this topic">＋ More questions</button>
+    <button class="send" id="send">Send triage to agent</button>
+  </div>
+</main>
+<script>
+const CONFIG = {
+  question: "Triage the scope for v1",
+  context: "Won't-do is the most valuable bucket — it records explicit non-goals the agent can defend later.",
+  recommendation: "The starting placement below.",
+  // item -> "must" | "nice" | "wont"
+  start: {
+    "User login": "must",
+    "Password reset": "must",
+    "Dark mode": "nice",
+    "Admin dashboard": "nice",
+    "Mobile app": "wont",
+  },
+};
+
+document.getElementById("question").textContent = CONFIG.question;
+document.getElementById("context").textContent = CONFIG.context;
+document.getElementById("recommendation").textContent = CONFIG.recommendation;
+
+const order = ["must", "nice", "wont"];
+const buckets = {};
+for (const b of document.querySelectorAll(".bucket")) buckets[b.dataset.bucket] = b;
+
+for (const [item, bucket] of Object.entries(CONFIG.start)) {
+  const div = document.createElement("div");
+  div.className = "item";
+  div.draggable = true;
+  div.setAttribute("data-lavish-action", "triage");
+  div.dataset.value = item;
+  const cyc = document.createElement("span");
+  cyc.className = "cyc";
+  cyc.textContent = "⇄";
+  cyc.title = "Move to next bucket";
+  div.appendChild(cyc);
+  div.appendChild(document.createTextNode(item));
+  (buckets[bucket] || buckets.nice).appendChild(div);
+}
+
+let dragged = null;
+document.addEventListener("dragstart", (e) => {
+  const item = e.target.closest?.(".item");
+  if (!item) return;
+  dragged = item;
+  item.classList.add("dragging");
+  e.dataTransfer.effectAllowed = "move";
+  e.dataTransfer.setData("text/plain", "");
+});
+document.addEventListener("dragend", () => {
+  if (dragged) dragged.classList.remove("dragging");
+  document.querySelectorAll(".bucket.dragover").forEach((b) => b.classList.remove("dragover"));
+  dragged = null;
+});
+for (const b of Object.values(buckets)) {
+  b.addEventListener("dragover", (e) => { e.preventDefault(); b.classList.add("dragover"); });
+  b.addEventListener("dragleave", () => b.classList.remove("dragover"));
+  b.addEventListener("drop", (e) => {
+    e.preventDefault();
+    b.classList.remove("dragover");
+    if (dragged) b.appendChild(dragged);
+  });
+}
+document.addEventListener("click", (e) => {
+  const cyc = e.target.closest?.(".cyc");
+  if (!cyc) return;
+  const item = cyc.closest(".item");
+  const current = item.closest(".bucket").dataset.bucket;
+  const next = order[(order.indexOf(current) + 1) % order.length];
+  buckets[next].appendChild(item);
+});
+
+function markSent(msg) {
+  const s = document.getElementById("status");
+  s.textContent = msg;
+  s.classList.add("sent");
+}
+document.getElementById("send").addEventListener("click", () => {
+  const out = {};
+  for (const key of order) out[key] = [...buckets[key].querySelectorAll(".item")].map((i) => i.dataset.value);
+  const summary = "Scope triage — must: [" + out.must.join(", ") + "], nice: [" + out.nice.join(", ") + "], won't: [" + out.wont.join(", ") + "]";
+  const data = { widget: "moscow-buckets", question: CONFIG.question, buckets: out };
+  if (!window.lavish) { console.log("[grill-me-lavish]", summary, data); markSent("No Lavish session — logged to console."); return; }
+  window.lavish.queuePrompt(summary, { tag: "grill-answer", text: summary, element: document.querySelector("main"), data });
+  window.lavish.sendQueuedPrompts();
+  markSent("Sent ✓ — re-triage and send again if you change your mind; the agent uses the latest.");
+});
+
+document.getElementById("moreQs").addEventListener("click", () => {
+  const summary = "User pressed 'More questions' — offer additional, deeper questions on this topic before moving on.";
+  const data = { widget: "meta", request: "more-questions", about: CONFIG.question };
+  if (!window.lavish) { console.log("[grill-me-lavish]", summary, data); markSent("No Lavish session — logged to console."); return; }
+  window.lavish.queuePrompt(summary, { tag: "grill-meta", text: "More questions requested", element: document.querySelector("main"), data });
+  window.lavish.sendQueuedPrompts();
+  markSent("Asked for more questions ✓ — the agent will dig deeper here.");
+});
+</script>
+</body>
+</html>
