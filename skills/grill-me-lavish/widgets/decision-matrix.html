@@ -174,9 +174,9 @@ document.getElementById("moreQs").addEventListener("click", () => {
   const summary = "User pressed 'More questions' — offer additional, deeper questions on this topic before moving on.";
   const data = { widget: "meta", request: "more-questions", about: CONFIG.question };
   if (!window.lavish) { console.log("[grill-me-lavish]", summary, data); markSent("No Lavish session — logged to console."); return; }
-  window.lavish.queuePrompt(summary, { tag: "grill-meta", text: "More questions requested", element: document.querySelector("main"), data });
-  window.lavish.sendQueuedPrompts();
-  markSent("Asked for more questions ✓ — the agent will dig deeper here.");
+  const sendOne = window.lavish.sendPrompt || ((p, o) => { window.lavish.queuePrompt(p, o); window.lavish.sendQueuedPrompts(); });
+  sendOne(summary, { tag: "grill-meta", text: "More questions requested", element: document.querySelector("main"), data });
+  markSent("Asked for more questions ✓ — new questions will appear; your queued answers stay put until you send them.");
 });
 </script>
 </body>

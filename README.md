@@ -31,19 +31,21 @@ relative priorities — not just collecting answers faster.
 
 1. The agent identifies the next unresolved decision in your plan and picks the
    widget that fits the decision type.
-2. It writes a small self-contained HTML artifact (one decision per page) under
+2. It writes ONE self-contained interview page (one decision per section) under
    `.grill-me-lavish/` and opens it in your browser via the bundled engine:
    `npx -y github:hotredsam/grill-me-lavish <file>`.
 3. You interact — drag, allocate, place the dot, pick a verdict. Every widget shows
    the agent's recommended answer and usually starts pre-set to it, so you react to
    a concrete suggestion instead of a blank form.
-4. The widget sends your answer back as **structured JSON** (never prose the agent
-   has to parse) through the engine's long-poll:
-   `npx -y github:hotredsam/grill-me-lavish poll <file>`.
-5. The agent incorporates it and moves to the next branch of the decision tree.
-   The round **＋ More questions** button on every widget tells the agent to go
-   deeper on the current topic, and you can chat freely from the browser at any
-   time — even while the agent is working.
+4. Your answers QUEUE locally as you go — nothing is sent until you press
+   **Send all answers**, so a batch can be the 3-question minimum or 100. It
+   arrives as **structured JSON** (never prose the agent has to parse) through
+   the engine's long-poll: `npx -y github:hotredsam/grill-me-lavish poll <file>`.
+5. The round **＋** button grows the page in place: it sends only a
+   more-questions signal (your queued answers stay put), the agent appends new
+   sections to the same file, and the page live-reloads taller with everything
+   you've done intact. You can also chat freely from the browser at any time —
+   even while the agent is working.
 
 ## Lineage: grill-me and lavish-axi
 
@@ -132,7 +134,8 @@ allocation: new widget types 30 · reliability 25 · interview flow 25 · themin
   must-haves); nice-to-haves A/B compare and heat-map grid remain open; explicit
   won't-dos: emoji reaction bar, budget range, timeline picker
 - Port the CPA v3 Night / Sepia / Sakura themes with a theme picker
-- Interview flow: instant response to ＋ More questions, visible interview progress
+- ~~Interview flow~~ shipped: growing single-page interviews — ＋ appends questions
+  in place, answers batch locally until one user-controlled send
 - Exploration: a "3D something" — a spatial widget for conveying what words can't
   (author's ask; shape TBD)
 - Every interview asks a minimum of three widget questions (now a SKILL.md rule)

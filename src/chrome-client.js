@@ -702,6 +702,25 @@ async function reloadAfterServerRestart() {
   location.reload();
 }
 
+// grill-me-lavish: submit a single prompt immediately, leaving the local
+// queue (the user's unsent batched answers) untouched.
+async function sendPromptNow(item) {
+  if (ended || !item) return;
+  try {
+    const body = { prompts: [stripInternalPromptFields(item)], domSnapshot: "" };
+    const response = await fetch("/api/" + key + "/prompts", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!response.ok) throw new Error("failed to send prompt");
+    addChat("user", item.text || item.prompt);
+    if (agentPresence === "listening") setAgentPresence("working");
+  } catch {
+    enqueuePrompt(item);
+  }
+}
+
 window.addEventListener("message", (event) => {
   if (event.source !== frame.contentWindow) return;
 
@@ -726,6 +745,7 @@ window.addEventListener("message", (event) => {
     submitLayoutWarnings(msg.layout_warnings).catch(() => {});
   }
   if (msg.type === "lavish:sendQueuedPrompts") sendQueued();
+  if (msg.type === "lavish:sendPromptNow") sendPromptNow(msg.prompt);
   if (msg.type === "lavish:endSession") endSession();
   if (msg.type === "lavish:toggleAnnotationMode") toggleAnnotationMode();
 });

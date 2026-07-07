@@ -215,8 +215,8 @@ document.getElementById("moreRound").addEventListener("click", () => {
   const summary = "User pressed the round + button — pull up an additional round of questions.";
   const data = { widget: "meta", request: "more-questions" };
   if (window.lavish) {
-    window.lavish.queuePrompt(summary, { tag: "grill-meta", text: "More questions requested", element: document.querySelector(".sendbar"), data });
-    window.lavish.sendQueuedPrompts();
+    const sendOne = window.lavish.sendPrompt || ((pr, o) => { window.lavish.queuePrompt(pr, o); window.lavish.sendQueuedPrompts(); });
+    sendOne(summary, { tag: "grill-meta", text: "More questions requested", element: document.querySelector(".sendbar"), data });
   } else console.log("[grill-me-lavish demo]", summary, data);
   const count = document.getElementById("count");
   count.textContent = "Asked for more questions ✓";

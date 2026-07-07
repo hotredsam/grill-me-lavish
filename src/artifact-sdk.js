@@ -565,6 +565,24 @@ export function createArtifactSdk(
     parent.postMessage({ type: "lavish:sendQueuedPrompts" }, "*");
   }
 
+  // grill-me-lavish: send ONE prompt immediately without touching the queue -
+  // lets widgets signal the agent (e.g. "more questions") while the user's
+  // queued answers stay local until they choose to send the batch.
+  function sendPrompt(prompt, options = {}) {
+    const originElement = options.element || document.activeElement || document.body;
+    const item = {
+      ...context(originElement),
+      prompt: String(prompt || ""),
+    };
+    if (options.uid) item.uid = String(options.uid);
+    if (options.selector) item.selector = String(options.selector);
+    if (options.tag) item.tag = String(options.tag);
+    if (options.text) item.text = String(options.text);
+    if (options.target) item.target = options.target;
+    if (options.data) item.prompt += "\n\nContext data:\n" + JSON.stringify(options.data, null, 2);
+    parent.postMessage({ type: "lavish:sendPromptNow", prompt: item }, "*");
+  }
+
   function endSession() {
     parent.postMessage({ type: "lavish:endSession" }, "*");
   }
@@ -1036,6 +1054,7 @@ export function createArtifactSdk(
   /** @type {Window & { lavish?: unknown }} */ (window).lavish = {
     queuePrompt,
     sendQueuedPrompts,
+    sendPrompt,
     endSession,
     getQueuedPrompts: () => [],
     setStatus: (message) => parent.postMessage({ type: "lavish:status", message: String(message) }, "*"),
