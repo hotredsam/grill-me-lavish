@@ -1,0 +1,157 @@
+<!doctype html>
+<!--
+  grill-me-lavish widget: risk-matrix
+  Decision type: triage several risks at once on likelihood × impact. Placement in
+  a quadrant is the decision: accept / monitor / mitigate / act now.
+  Emits (via window.lavish.queuePrompt options.data):
+    { widget: "risk-matrix", question: "...",
+      placements: [ { name, likelihood: 0-100, impact: 0-100, quadrant } ] }
+  Adapt: edit the CONFIG block. Pre-place each risk at your recommended position.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>grill-me-lavish · Risk matrix</title>
+<style>
+:root{--bg:oklch(0.975 0.006 75);--card:oklch(0.995 0.003 75);--text:oklch(0.22 0.01 50);--muted:oklch(0.42 0.012 50);--accent:oklch(0.52 0.18 18);--border:oklch(0.88 0.008 60);--good:oklch(0.48 0.12 145);--bad:oklch(0.52 0.2 28)}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font:16px/1.5 Geist,system-ui,-apple-system,"Segoe UI",sans-serif;display:flex;justify-content:center;padding:32px 16px}
+main{width:100%;max-width:720px}
+.kicker{font-family:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+h1{font-size:24px;margin:0 0 8px}
+.context{color:var(--muted);margin:0 0 16px}
+.rec{background:oklch(0.96 0.04 18);border:1px solid oklch(0.85 0.08 18);border-radius:10px;padding:10px 14px;margin:0 0 20px;font-size:14px}
+.rec b{color:var(--accent);font-weight:600;margin-right:6px}
+.grid-wrap{display:grid;grid-template-columns:28px minmax(0,1fr);grid-template-rows:minmax(0,1fr) 28px;gap:4px}
+.y-label{writing-mode:vertical-rl;transform:rotate(180deg);display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--muted)}
+.x-label{grid-column:2;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--muted)}
+.matrix{position:relative;aspect-ratio:4/3;background:var(--card);border:1px solid var(--border);border-radius:12px;cursor:crosshair;touch-action:none}
+.matrix .half{position:absolute;pointer-events:none}
+.matrix .q{position:absolute;font-family:"Geist Mono",ui-monospace,monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);pointer-events:none;padding:8px 10px}
+.matrix .q.tl{top:0;left:0}.matrix .q.tr{top:0;right:0}.matrix .q.bl{bottom:0;left:0}.matrix .q.br{bottom:0;right:0}
+.matrix .mid-v{position:absolute;left:50%;top:0;bottom:0;border-left:1px dashed var(--border);pointer-events:none}
+.matrix .mid-h{position:absolute;top:50%;left:0;right:0;border-top:1px dashed var(--border);pointer-events:none}
+.chip{position:absolute;transform:translate(-50%,-50%);background:var(--accent);color:#fff;border:2px solid #fff;border-radius:50px;padding:3px 10px;font-size:12px;font-weight:600;cursor:grab;white-space:nowrap;box-shadow:0 2px 8px rgba(40,30,20,.2);user-select:none}
+.chip.active{cursor:grabbing;z-index:5}
+.legend{font-size:13px;color:var(--muted);margin:10px 0 0}
+.readout{font-size:12px;color:var(--muted);margin:8px 0 0;font-variant-numeric:tabular-nums;line-height:1.7}
+.footer{display:flex;align-items:center;gap:16px;margin-top:20px}
+.status{flex:1;font-size:13px;color:var(--muted);margin:0}
+.status.sent{color:var(--good)}
+button.more-qs{background:none;border:1px dashed var(--border);color:var(--muted);border-radius:50px;padding:10px 16px;font-size:13px;cursor:pointer}
+button.more-qs:hover{color:var(--accent);border-color:var(--accent)}
+button.send{background:var(--accent);color:#fff;border:0;border-radius:10px;padding:12px 20px;font-size:15px;font-weight:600;cursor:pointer}
+</style>
+</head>
+<body>
+<main data-lavish-question="risk-matrix">
+  <p class="kicker">grill-me-lavish · risk matrix</p>
+  <h1 id="question"></h1>
+  <p class="context" id="context"></p>
+  <div class="rec"><b>Agent recommends</b> <span id="recommendation"></span></div>
+  <div class="grid-wrap">
+    <div class="y-label">Impact →</div>
+    <div class="matrix" id="matrix" data-lavish-action="place-risk">
+      <span class="mid-v"></span><span class="mid-h"></span>
+      <span class="q tl">mitigate</span><span class="q tr">act now</span>
+      <span class="q bl">accept</span><span class="q br">monitor</span>
+    </div>
+    <div></div>
+    <div class="x-label">Likelihood →</div>
+  </div>
+  <p class="legend">Drag each risk chip to where it belongs. Quadrant = what to do about it.</p>
+  <p class="readout" id="readout"></p>
+  <div class="footer">
+    <p class="status" id="status">Place every risk, then send.</p>
+    <button class="more-qs" id="moreQs" type="button" title="Tell the agent to go deeper on this topic">＋ More questions</button>
+    <button class="send" id="send">Send matrix to agent</button>
+  </div>
+</main>
+<script>
+const CONFIG = {
+  question: "Place each risk: how likely, how bad?",
+  context: "Quadrants map to actions — accept (low/low), monitor (likely but mild), mitigate (unlikely but severe), act now (likely and severe).",
+  recommendation: "The starting placements below.",
+  // name -> { likelihood: 0-100, impact: 0-100 }
+  risks: {
+    "Scope creep": { likelihood: 70, impact: 60 },
+    "Key dependency breaks": { likelihood: 30, impact: 85 },
+    "Timeline slips": { likelihood: 60, impact: 40 },
+  },
+};
+
+document.getElementById("question").textContent = CONFIG.question;
+document.getElementById("context").textContent = CONFIG.context;
+document.getElementById("recommendation").textContent = CONFIG.recommendation;
+
+const matrix = document.getElementById("matrix");
+const chips = Object.entries(CONFIG.risks).map(([name, pos]) => {
+  const el = document.createElement("span");
+  el.className = "chip";
+  el.setAttribute("data-lavish-action", "drag-risk");
+  el.textContent = name;
+  matrix.appendChild(el);
+  return { name, x: pos.likelihood, y: pos.impact, el };
+});
+function quadrant(c) {
+  if (c.x < 50 && c.y < 50) return "accept";
+  if (c.x >= 50 && c.y < 50) return "monitor";
+  if (c.x < 50 && c.y >= 50) return "mitigate";
+  return "act now";
+}
+function place(c) {
+  c.el.style.left = c.x + "%";
+  c.el.style.top = (100 - c.y) + "%";
+}
+function readout() {
+  document.getElementById("readout").innerHTML = chips
+    .map((c) => c.name + ": likelihood " + c.x + ", impact " + c.y + " → <b>" + quadrant(c) + "</b>")
+    .join("<br>");
+}
+chips.forEach(place);
+readout();
+
+let active = null;
+function moveTo(c, clientX, clientY) {
+  const r = matrix.getBoundingClientRect();
+  c.x = Math.round(Math.min(100, Math.max(0, ((clientX - r.left) / r.width) * 100)));
+  c.y = Math.round(Math.min(100, Math.max(0, (1 - (clientY - r.top) / r.height) * 100)));
+  place(c); readout();
+}
+matrix.addEventListener("pointerdown", (e) => {
+  const hit = chips.find((c) => c.el === e.target || c.el.contains(e.target));
+  if (!hit) return;
+  active = hit;
+  hit.el.classList.add("active");
+  matrix.setPointerCapture(e.pointerId);
+  moveTo(active, e.clientX, e.clientY);
+});
+matrix.addEventListener("pointermove", (e) => { if (active) moveTo(active, e.clientX, e.clientY); });
+matrix.addEventListener("pointerup", () => { if (active) active.el.classList.remove("active"); active = null; });
+
+function markSent(msg) {
+  const s = document.getElementById("status");
+  s.textContent = msg;
+  s.classList.add("sent");
+}
+document.getElementById("send").addEventListener("click", () => {
+  const placements = chips.map((c) => ({ name: c.name, likelihood: c.x, impact: c.y, quadrant: quadrant(c) }));
+  const summary = "Risk matrix — " + placements.map((p) => p.name + ": " + p.quadrant + " (L" + p.likelihood + "/I" + p.impact + ")").join("; ");
+  const data = { widget: "risk-matrix", question: CONFIG.question, placements };
+  if (!window.lavish) { console.log("[grill-me-lavish]", summary, data); markSent("No Lavish session — logged to console."); return; }
+  window.lavish.queuePrompt(summary, { tag: "grill-answer", text: summary, element: document.querySelector("main"), data });
+  window.lavish.sendQueuedPrompts();
+  markSent("Sent ✓ — re-place and send again if you change your mind; the agent uses the latest.");
+});
+document.getElementById("moreQs").addEventListener("click", () => {
+  const summary = "User pressed 'More questions' — offer additional, deeper questions on this topic before moving on.";
+  const data = { widget: "meta", request: "more-questions", about: CONFIG.question };
+  if (!window.lavish) { console.log("[grill-me-lavish]", summary, data); markSent("No Lavish session — logged to console."); return; }
+  const sendOne = window.lavish.sendPrompt || ((p, o) => { window.lavish.queuePrompt(p, o); window.lavish.sendQueuedPrompts(); });
+  sendOne(summary, { tag: "grill-meta", text: "More questions requested", element: document.querySelector("main"), data });
+  markSent("Asked for more questions ✓ — new questions will appear; your queued answers stay put until you send them.");
+});
+</script>
+</body>
+</html>

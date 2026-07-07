@@ -1,0 +1,180 @@
+<!doctype html>
+<!--
+  grill-me-lavish widget: bubble-burst
+  Decision type: mass context intake, best at the START of an interview. The agent
+  pre-generates 30-50 candidate facts/constraints/preferences as bubbles; the user
+  taps everything that applies and can add their own — transferring a pile of
+  context in seconds without typing.
+  Emits (via window.lavish.queuePrompt options.data):
+    { widget: "bubble-burst", question: "...",
+      selected: [...], unselected: [...], custom: [...] }
+  Adapt: edit the CONFIG block. Pre-select your best guesses (preSelected: true)
+  so the user corrects rather than authors. Group related bubbles with `group`.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>grill-me-lavish · Bubble burst</title>
+<style>
+:root{--bg:oklch(0.975 0.006 75);--card:oklch(0.995 0.003 75);--text:oklch(0.22 0.01 50);--muted:oklch(0.42 0.012 50);--accent:oklch(0.52 0.18 18);--border:oklch(0.88 0.008 60);--good:oklch(0.48 0.12 145);--bad:oklch(0.52 0.2 28)}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font:16px/1.5 Geist,system-ui,-apple-system,"Segoe UI",sans-serif;display:flex;justify-content:center;padding:32px 16px}
+main{width:100%;max-width:760px}
+.kicker{font-family:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+h1{font-size:24px;margin:0 0 8px}
+.context{color:var(--muted);margin:0 0 16px}
+.rec{background:oklch(0.96 0.04 18);border:1px solid oklch(0.85 0.08 18);border-radius:10px;padding:10px 14px;margin:0 0 20px;font-size:14px}
+.rec b{color:var(--accent);font-weight:600;margin-right:6px}
+.group{margin-bottom:14px}
+.group-label{font-family:"Geist Mono",ui-monospace,monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+.cloud{display:flex;flex-wrap:wrap;gap:8px}
+.bubble{background:var(--card);border:1px solid var(--border);border-radius:50px;padding:8px 16px;font-size:14px;cursor:pointer;user-select:none;transition:transform .08s ease,background .12s,border-color .12s,color .12s}
+.bubble:hover{border-color:var(--accent)}
+.bubble:active{transform:scale(.94)}
+.bubble.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.bubble.custom-tag{border-style:dashed}
+.adder{display:flex;gap:8px;margin-top:16px}
+.adder input{flex:1;background:var(--card);border:1px solid var(--border);border-radius:50px;color:var(--text);font:14px/1.4 inherit;padding:9px 16px}
+.adder input:focus{outline:2px solid var(--accent);outline-offset:1px}
+.adder button{background:none;border:1px solid var(--border);color:var(--muted);border-radius:50px;padding:9px 16px;font-size:13px;cursor:pointer}
+.adder button:hover{color:var(--accent);border-color:var(--accent)}
+.tally{font-size:13px;color:var(--muted);margin:12px 0 0;font-variant-numeric:tabular-nums}
+.footer{display:flex;align-items:center;gap:16px;margin-top:20px}
+.status{flex:1;font-size:13px;color:var(--muted);margin:0}
+.status.sent{color:var(--good)}
+button.more-qs{background:none;border:1px dashed var(--border);color:var(--muted);border-radius:50px;padding:10px 16px;font-size:13px;cursor:pointer}
+button.more-qs:hover{color:var(--accent);border-color:var(--accent)}
+button.send{background:var(--accent);color:#fff;border:0;border-radius:10px;padding:12px 20px;font-size:15px;font-weight:600;cursor:pointer}
+</style>
+</head>
+<body>
+<main data-lavish-question="bubble-burst">
+  <p class="kicker">grill-me-lavish · bubble burst</p>
+  <h1 id="question"></h1>
+  <p class="context" id="context"></p>
+  <div class="rec"><b>Agent recommends</b> <span id="recommendation"></span></div>
+  <div id="groups"></div>
+  <div class="adder">
+    <input id="customInput" placeholder="Something missing? Type it and add your own bubble…" maxlength="80">
+    <button type="button" id="addBubble">Add bubble</button>
+  </div>
+  <p class="tally" id="tally"></p>
+  <div class="footer">
+    <p class="status" id="status">Tap everything that applies, then send.</p>
+    <button class="more-qs" id="moreQs" type="button" title="Tell the agent to go deeper on this topic">＋ More questions</button>
+    <button class="send" id="send">Send bubbles to agent</button>
+  </div>
+</main>
+<script>
+const CONFIG = {
+  question: "Tap everything that's true for this project",
+  context: "Mass intake: knock out a pile of context in seconds. Tap to select, tap again to unselect, add bubbles the agent missed.",
+  recommendation: "The pre-selected bubbles are the agent's best guesses — correct them.",
+  // { label, group?, preSelected? } — aim for 30-50 bubbles when doing real intake
+  bubbles: [
+    { label: "Solo project", group: "Team", preSelected: true },
+    { label: "Has users today", group: "Team" },
+    { label: "Deadline is real", group: "Constraints" },
+    { label: "Budget-sensitive", group: "Constraints" },
+    { label: "Must run offline", group: "Constraints" },
+    { label: "Perf matters", group: "Quality bar", preSelected: true },
+    { label: "Polish matters", group: "Quality bar" },
+    { label: "Tests required", group: "Quality bar" },
+  ],
+};
+
+document.getElementById("question").textContent = CONFIG.question;
+document.getElementById("context").textContent = CONFIG.context;
+document.getElementById("recommendation").textContent = CONFIG.recommendation;
+
+const groupsEl = document.getElementById("groups");
+const groups = {};
+for (const b of CONFIG.bubbles) {
+  const g = b.group || "General";
+  if (!groups[g]) {
+    const wrap = document.createElement("div");
+    wrap.className = "group";
+    const label = document.createElement("p");
+    label.className = "group-label";
+    label.textContent = g;
+    const cloud = document.createElement("div");
+    cloud.className = "cloud";
+    wrap.appendChild(label);
+    wrap.appendChild(cloud);
+    groupsEl.appendChild(wrap);
+    groups[g] = cloud;
+  }
+  addBubble(groups[g], b.label, !!b.preSelected, false);
+}
+function addBubble(cloud, label, on, isCustom) {
+  const el = document.createElement("span");
+  el.className = "bubble" + (on ? " on" : "") + (isCustom ? " custom-tag" : "");
+  el.setAttribute("data-lavish-action", "toggle-bubble");
+  el.dataset.custom = isCustom ? "1" : "";
+  el.textContent = label;
+  el.addEventListener("click", () => { el.classList.toggle("on"); tally(); });
+  cloud.appendChild(el);
+}
+function allBubbles() { return [...document.querySelectorAll(".bubble")]; }
+function tally() {
+  const on = allBubbles().filter((b) => b.classList.contains("on")).length;
+  document.getElementById("tally").textContent = on + " of " + allBubbles().length + " selected";
+}
+tally();
+
+let customCloud = null;
+document.getElementById("addBubble").addEventListener("click", () => {
+  const input = document.getElementById("customInput");
+  const label = input.value.trim();
+  if (!label) return;
+  if (!customCloud) {
+    const wrap = document.createElement("div");
+    wrap.className = "group";
+    const gl = document.createElement("p");
+    gl.className = "group-label";
+    gl.textContent = "Yours";
+    customCloud = document.createElement("div");
+    customCloud.className = "cloud";
+    wrap.appendChild(gl);
+    wrap.appendChild(customCloud);
+    groupsEl.appendChild(wrap);
+  }
+  addBubble(customCloud, label, true, true);
+  input.value = "";
+  tally();
+});
+document.getElementById("customInput").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") { e.preventDefault(); document.getElementById("addBubble").click(); }
+});
+
+function markSent(msg) {
+  const s = document.getElementById("status");
+  s.textContent = msg;
+  s.classList.add("sent");
+}
+document.getElementById("send").addEventListener("click", () => {
+  const selected = [], unselected = [], custom = [];
+  for (const b of allBubbles()) {
+    const on = b.classList.contains("on");
+    if (b.dataset.custom) { if (on) custom.push(b.textContent); continue; }
+    (on ? selected : unselected).push(b.textContent);
+  }
+  const summary = "Bubbles — selected: [" + selected.concat(custom).join(", ") + "]; not selected: [" + unselected.join(", ") + "]";
+  const data = { widget: "bubble-burst", question: CONFIG.question, selected, unselected, custom };
+  if (!window.lavish) { console.log("[grill-me-lavish]", summary, data); markSent("No Lavish session — logged to console."); return; }
+  window.lavish.queuePrompt(summary, { tag: "grill-answer", text: summary, element: document.querySelector("main"), data });
+  window.lavish.sendQueuedPrompts();
+  markSent("Sent ✓ — re-tap and send again if you change your mind; the agent uses the latest.");
+});
+document.getElementById("moreQs").addEventListener("click", () => {
+  const summary = "User pressed 'More questions' — offer additional, deeper questions on this topic before moving on.";
+  const data = { widget: "meta", request: "more-questions", about: CONFIG.question };
+  if (!window.lavish) { console.log("[grill-me-lavish]", summary, data); markSent("No Lavish session — logged to console."); return; }
+  const sendOne = window.lavish.sendPrompt || ((p, o) => { window.lavish.queuePrompt(p, o); window.lavish.sendQueuedPrompts(); });
+  sendOne(summary, { tag: "grill-meta", text: "More questions requested", element: document.querySelector("main"), data });
+  markSent("Asked for more questions ✓ — new questions will appear; your queued answers stay put until you send them.");
+});
+</script>
+</body>
+</html>

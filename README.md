@@ -31,19 +31,21 @@ relative priorities — not just collecting answers faster.
 
 1. The agent identifies the next unresolved decision in your plan and picks the
    widget that fits the decision type.
-2. It writes a small self-contained HTML artifact (one decision per page) under
+2. It writes ONE self-contained interview page (one decision per section) under
    `.grill-me-lavish/` and opens it in your browser via the bundled engine:
    `npx -y github:hotredsam/grill-me-lavish <file>`.
 3. You interact — drag, allocate, place the dot, pick a verdict. Every widget shows
    the agent's recommended answer and usually starts pre-set to it, so you react to
-   a strawman instead of a blank form.
-4. The widget sends your answer back as **structured JSON** (never prose the agent
-   has to parse) through the engine's long-poll:
-   `npx -y github:hotredsam/grill-me-lavish poll <file>`.
-5. The agent incorporates it and moves to the next branch of the decision tree.
-   The round **＋ More questions** button on every widget tells the agent to go
-   deeper on the current topic, and you can chat freely from the browser at any
-   time — even while the agent is working.
+   a concrete suggestion instead of a blank form.
+4. Your answers QUEUE locally as you go — nothing is sent until you press
+   **Send all answers**, so a batch can be the 3-question minimum or 100. It
+   arrives as **structured JSON** (never prose the agent has to parse) through
+   the engine's long-poll: `npx -y github:hotredsam/grill-me-lavish poll <file>`.
+5. The round **＋** button grows the page in place: it sends only a
+   more-questions signal (your queued answers stay put), the agent appends new
+   sections to the same file, and the page live-reloads taller with everything
+   you've done intact. You can also chat freely from the browser at any time —
+   even while the agent is working.
 
 ## Lineage: grill-me and lavish-axi
 
@@ -111,14 +113,40 @@ npx -y github:hotredsam/grill-me-lavish end <html-file>    # end a session
 | `pairwise` | true preference is best exposed by forced this-vs-that duels |
 | `confidence-slider` | an ordinary single question — the confidence tells the agent where to dig |
 | `moscow-buckets` | scope triage: must-have / nice-to-have / won't-do |
-| `strawman` | the agent has a concrete default and needs accept / tweak / reject + reason |
+| `suggested-answer` | the agent has a concrete default and needs accept / tweak / reject + reason |
 | `annotation-canvas` | words fail — sketch it freehand with a note |
+| `risk-matrix` | several risks need triage on likelihood × impact — quadrant = action |
+| `free-text-form` | the user wants to write, with structure — labeled prompts, keyed answers |
+| `bubble-burst` | interview opener — tap-to-select bubble cloud for mass context intake |
 
 Every widget emits structured JSON through the injected SDK
 (`window.lavish.queuePrompt(...)` with a `data` payload). Each widget file is
 self-contained (no CDN dependencies) with a `CONFIG` block at the top the agent
 adapts per question, includes the round **＋ More questions** button, and degrades
 gracefully (logs to console) when opened outside a session.
+
+## Roadmap
+
+Decided by grilling the author with the tool itself (two sessions, 2026-07-06;
+final consolidated read: **accepted**). This is a personal tool (audience 10/100)
+built to a high polish bar (investment 90/100), for grilling ANY plan — code,
+CPA study, school, life projects.
+
+1. **Theme port** — Sakura first, then Sepia (author's ranking; Night only as the
+   system-dark auto-switch target; Paper stays default). Architecture: the agent
+   bakes the theme into each interview page at write time — no live picker.
+2. **relation-canvas widget** — the demystified "3D something": a draggable
+   Excalidraw-style node/edge diagram (e.g. database relations) emitting graph
+   JSON. The moment it serves: "let me show you how these relate."
+3. **A/B compare widget** — UI variants side-by-side first (screenshots/mockups,
+   pick + why); code-approaches mode after.
+4. **Heat-map grid widget.**
+5. npm publish eventually; sharing publicly is gated on: more real-world use,
+   a demo GIF, and a docs/install polish pass.
+
+Top project risk (author-placed, likelihood 84/impact 85): abandonment — the
+mitigation is grilling a real project every week. Opening batch size target: ~5
+questions (3 is the hard minimum).
 
 ## Requirements
 

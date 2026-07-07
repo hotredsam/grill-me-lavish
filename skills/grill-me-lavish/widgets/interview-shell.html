@@ -1,0 +1,198 @@
+<!doctype html>
+<!--
+  grill-me-lavish template: interview-shell (v2)
+  THE growing-page interview. One file per interview; the agent APPENDS question
+  sections (before the APPEND marker) and the page live-reloads taller.
+
+  UX model (deliberately one path, no queue-vs-send confusion):
+  - Answers AUTO-QUEUE as the user changes controls (debounced; re-queues replace
+    via the section's data-lavish-question). There are no per-section buttons.
+  - ONE send button flushes the whole batch when the user chooses — 3 answers or
+    100. The button label shows the live count.
+  - The round ＋ sends ONLY a more-questions signal (window.lavish.sendPrompt);
+    queued answers stay local. The agent appends sections in response.
+  - The progress strip at the top shows every question's answered state and
+    scrolls to it on click. Editing an already-sent answer re-queues it; the next
+    send updates the agent.
+  - On live reload the chrome replays the queue (lavish:queue-state) and the page
+    re-marks answered sections — answers are never lost, and now they look it.
+
+  How the agent appends a question: copy a SECTION BLOCK (<section> + its
+  <script>), bump the qNN id everywhere in the block, adapt the controls from any
+  widget in this folder, and implement collect() returning {summary, data} (or
+  null while incomplete). gml.bindSection wires auto-queue + progress.
+
+  IMPORTANT: auto-queue only fires on interaction. Any section whose controls
+  START at your recommended answer (pre-positioned dot, pre-ordered list,
+  pre-set slider) must include a native checkbox like
+  <label class="accept"><input type="checkbox"> The default is right</label>
+  so accepting without touching still queues; collect() returns non-null when
+  touched OR that box is checked. Otherwise silent agreement is lost.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>grill-me-lavish · Interview</title>
+<style>
+:root{--bg:oklch(0.975 0.006 75);--card:oklch(0.995 0.003 75);--text:oklch(0.22 0.01 50);--muted:oklch(0.42 0.012 50);--accent:oklch(0.52 0.18 18);--border:oklch(0.88 0.008 60);--good:oklch(0.48 0.12 145);--bad:oklch(0.52 0.2 28)}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font:16px/1.5 Geist,system-ui,-apple-system,"Segoe UI",sans-serif;display:flex;justify-content:center;padding:76px 16px 110px}
+main{width:100%;max-width:720px}
+.kicker{font-family:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+h1{font-size:26px;margin:0 0 6px}
+.lede{color:var(--muted);margin:0 0 24px}
+.progress{position:fixed;top:0;left:0;right:0;background:oklch(0.995 0.003 75 / 0.96);border-bottom:1px solid var(--border);display:flex;justify-content:center;padding:10px 16px;z-index:10;backdrop-filter:blur(4px)}
+.progress .inner{width:100%;max-width:720px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.progress .plabel{font-family:"Geist Mono",ui-monospace,monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-right:6px}
+.pchip{font-family:"Geist Mono",ui-monospace,monospace;font-size:11px;border:1px solid var(--border);border-radius:50px;padding:4px 10px;cursor:pointer;color:var(--muted);user-select:none}
+.pchip.done{background:var(--good);border-color:var(--good);color:#fff}
+.pchip:hover{border-color:var(--accent)}
+section.q{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:16px;scroll-margin-top:64px}
+section.q h2{font-size:18px;margin:0 0 4px}
+section.q h2 .qnum{font-family:"Geist Mono",ui-monospace,monospace;font-size:11px;color:var(--muted);margin-right:8px;letter-spacing:.08em}
+section.q .ctx{font-size:14px;color:var(--muted);margin:0 0 12px}
+section.q .saved{font-size:12px;color:var(--good);margin:10px 0 0;min-height:16px}
+.rec{background:oklch(0.96 0.04 18);border:1px solid oklch(0.85 0.08 18);border-radius:10px;padding:8px 12px;margin:0 0 14px;font-size:13px}
+.rec b{color:var(--accent);font-weight:600;margin-right:6px}
+.opts label{display:flex;gap:10px;align-items:flex-start;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:11px 14px;margin-bottom:6px;cursor:pointer}
+.opts label:has(input:checked){border-color:var(--accent);background:oklch(0.96 0.04 18)}
+.opts input{accent-color:var(--accent);margin-top:4px}
+input[type=range]{display:block;width:100%;margin:8px 0 0;accent-color:var(--accent)}
+textarea{width:100%;margin-top:8px;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text);font:14px/1.5 inherit;padding:10px;resize:vertical;min-height:52px}
+.sendbar{position:fixed;left:0;right:0;bottom:0;background:oklch(0.995 0.003 75 / 0.96);border-top:1px solid var(--border);padding:14px 16px;display:flex;justify-content:center;backdrop-filter:blur(4px)}
+.sendbar .inner{width:100%;max-width:720px;display:flex;align-items:center;gap:14px}
+.sendbar .count{flex:1;font-size:13px;color:var(--muted)}
+button.round-more{width:44px;height:44px;border-radius:50%;background:none;border:1px dashed var(--accent);color:var(--accent);font-size:22px;line-height:1;cursor:pointer;flex-shrink:0}
+button.round-more:hover{background:oklch(0.96 0.04 18)}
+button.send{background:var(--accent);color:#fff;border:0;border-radius:10px;padding:12px 20px;font-size:15px;font-weight:600;cursor:pointer}
+button.send:disabled{opacity:.4;cursor:not-allowed}
+</style>
+</head>
+<body>
+<div class="progress"><div class="inner"><span class="plabel">Progress</span><span id="gml-chips" style="display:flex;flex-wrap:wrap;gap:6px;min-width:0;flex:1"></span></div></div>
+<script>
+// Interview runtime: auto-queue per section (replace-on-requeue), progress strip,
+// queue restore after live reloads (chrome replays lavish:queue-state).
+window.gml = {
+  sections: new Map(),
+  bindSection(id, collect) {
+    const sec = document.querySelector('[data-lavish-question="' + id + '"]');
+    const entry = { id, sec, collect, timer: null, answered: false };
+    this.sections.set(id, entry);
+    const chip = document.createElement("span");
+    chip.className = "pchip";
+    chip.textContent = id.toUpperCase();
+    chip.title = sec.querySelector("h2")?.textContent || id;
+    chip.addEventListener("click", () => sec.scrollIntoView({ behavior: "smooth", block: "start" }));
+    document.getElementById("gml-chips").appendChild(chip);
+    entry.chip = chip;
+    const queueNow = () => {
+      const result = entry.collect(sec);
+      if (!result) return;
+      if (window.lavish) {
+        window.lavish.queuePrompt(result.summary, { tag: "grill-answer", text: result.summary, element: sec, data: result.data });
+      } else {
+        console.log("[grill-me-lavish]", result.summary, result.data);
+      }
+      this.markAnswered(entry, result.summary);
+    };
+    sec.addEventListener("input", () => { clearTimeout(entry.timer); entry.timer = setTimeout(queueNow, 500); });
+    sec.addEventListener("change", () => { clearTimeout(entry.timer); entry.timer = setTimeout(queueNow, 250); });
+  },
+  markAnswered(entry, summary) {
+    entry.answered = true;
+    entry.chip.classList.add("done");
+    const saved = entry.sec.querySelector(".saved");
+    if (saved) saved.textContent = "saved ✓ — will go with the next send" + (summary ? " · " + (summary.length > 90 ? summary.slice(0, 90) + "…" : summary) : "");
+    this.refreshBar();
+  },
+  refreshBar() {
+    const n = [...this.sections.values()].filter((e) => e.answered).length;
+    const send = document.getElementById("gml-send");
+    if (!send) return;
+    send.disabled = n === 0;
+    send.textContent = n === 0 ? "Send answers" : "Send " + n + " answer" + (n === 1 ? "" : "s");
+  },
+};
+
+// Re-mark answered sections when the chrome replays the queue (initial load and
+// after every live reload or queue change).
+document.addEventListener("lavish:queue-state", (event) => {
+  const prompts = event.detail?.prompts || [];
+  for (const p of prompts) {
+    if (p.tag !== "grill-answer" || !p.queueKey) continue;
+    const entry = gml.sections.get(p.queueKey);
+    if (entry && !entry.answered) gml.markAnswered(entry, p.text || "");
+  }
+});
+</script>
+<main id="interview">
+  <p class="kicker">grill-me-lavish · interview</p>
+  <h1 id="title">Interview title (agent: set per interview)</h1>
+  <p class="lede">Change any control and your answer saves automatically (green chip up top = answered). Nothing reaches the agent until you press <b>Send</b> — batch as few or as many as you want. The round ＋ adds more questions to this page without sending anything. Editing an answer later just updates it.</p>
+
+  <!-- ══════════════ SECTION BLOCK (example 1: single choice) ══════════════ -->
+  <section class="q" data-lavish-question="q01">
+    <h2><span class="qnum">Q01</span>Example: which approach?</h2>
+    <p class="ctx">Agent: replace with your question and context.</p>
+    <div class="rec"><b>Agent recommends</b> Approach A — pre-selected.</div>
+    <div class="opts">
+      <label><input type="radio" name="q01-answer" value="Approach A" checked><span>Approach A</span></label>
+      <label><input type="radio" name="q01-answer" value="Approach B"><span>Approach B</span></label>
+    </div>
+    <p class="saved"></p>
+  </section>
+  <script>
+  gml.bindSection("q01", (sec) => {
+    const answer = sec.querySelector("input[name='q01-answer']:checked")?.value;
+    if (!answer) return null;
+    return { summary: "Q01 answer: " + answer,
+      data: { widget: "single-choice", question: "Example: which approach?", answer } };
+  });
+  </script>
+
+  <!-- ══════════════ SECTION BLOCK (example 2: free text) ══════════════ -->
+  <section class="q" data-lavish-question="q02">
+    <h2><span class="qnum">Q02</span>Example: in your own words</h2>
+    <p class="ctx">Agent: replace with your prompt.</p>
+    <div class="rec"><b>Agent asks</b> rough fragments are fine.</div>
+    <textarea placeholder="Write here…"></textarea>
+    <p class="saved"></p>
+  </section>
+  <script>
+  gml.bindSection("q02", (sec) => {
+    const text = sec.querySelector("textarea").value.trim();
+    if (!text) return null;
+    return { summary: "Q02 answer: " + text,
+      data: { widget: "free-text", question: "Example: in your own words", answer: text } };
+  });
+  </script>
+
+  <!-- APPEND NEW SECTIONS ABOVE THIS LINE — copy a SECTION BLOCK, bump the qNN id -->
+</main>
+
+<div class="sendbar"><div class="inner">
+  <span class="count" id="gml-count">Answers save as you go; send whenever you're ready.</span>
+  <button class="round-more" id="gml-more" type="button" title="Add more questions to this page (sends nothing else)">＋</button>
+  <button class="send" id="gml-send" disabled>Send answers</button>
+</div></div>
+
+<script>
+document.getElementById("gml-send").addEventListener("click", () => {
+  if (window.lavish) window.lavish.sendQueuedPrompts();
+  else console.log("[grill-me-lavish] sendQueuedPrompts (no SDK)");
+  document.getElementById("gml-count").textContent = "Batch sent ✓ — edit anything to queue an update.";
+});
+document.getElementById("gml-more").addEventListener("click", () => {
+  const summary = "User pressed ＋ — append more question sections to this interview page. Their queued answers were NOT sent; do not wait for them.";
+  const data = { widget: "meta", request: "more-questions" };
+  if (!window.lavish) return console.log("[grill-me-lavish]", summary, data);
+  const sendOne = window.lavish.sendPrompt || ((p, o) => { window.lavish.queuePrompt(p, o); window.lavish.sendQueuedPrompts(); });
+  sendOne(summary, { tag: "grill-meta", text: "More questions requested", element: document.querySelector(".sendbar"), data });
+  document.getElementById("gml-count").textContent = "More questions requested — the page will grow shortly; your saved answers stay put.";
+});
+gml.refreshBar();
+</script>
+</body>
+</html>

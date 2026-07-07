@@ -1,0 +1,133 @@
+<!doctype html>
+<!--
+  grill-me-lavish widget: free-text-form
+  Decision type: the user wants to write, not click — but with structure. A small
+  set of labeled prompts (keep it to 2-4, one decision cluster) each get a
+  textarea; answers come back keyed, so the agent still never parses a blob.
+  Emits (via window.lavish.queuePrompt options.data):
+    { widget: "free-text-form", question: "...", answers: { key: "text", ... } }
+  Adapt: edit the CONFIG block — fields[].key/label/placeholder/required.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>grill-me-lavish · Write it out</title>
+<style>
+:root{--bg:oklch(0.975 0.006 75);--card:oklch(0.995 0.003 75);--text:oklch(0.22 0.01 50);--muted:oklch(0.42 0.012 50);--accent:oklch(0.52 0.18 18);--border:oklch(0.88 0.008 60);--good:oklch(0.48 0.12 145);--bad:oklch(0.52 0.2 28)}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font:16px/1.5 Geist,system-ui,-apple-system,"Segoe UI",sans-serif;display:flex;justify-content:center;padding:32px 16px}
+main{width:100%;max-width:680px}
+.kicker{font-family:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+h1{font-size:24px;margin:0 0 8px}
+.context{color:var(--muted);margin:0 0 16px}
+.rec{background:oklch(0.96 0.04 18);border:1px solid oklch(0.85 0.08 18);border-radius:10px;padding:10px 14px;margin:0 0 20px;font-size:14px}
+.rec b{color:var(--accent);font-weight:600;margin-right:6px}
+.field{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px}
+.field label{display:block;font-weight:600;font-size:14px;margin-bottom:2px}
+.field .req{color:var(--accent);margin-left:4px}
+.field .hint{font-size:12px;color:var(--muted);margin:0 0 8px}
+.field textarea{width:100%;min-height:84px;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text);font:14px/1.5 inherit;padding:10px;resize:vertical}
+.field textarea:focus{outline:2px solid var(--accent);outline-offset:1px}
+.count{font-size:11px;color:var(--muted);text-align:right;margin-top:4px;font-variant-numeric:tabular-nums}
+.footer{display:flex;align-items:center;gap:16px;margin-top:20px}
+.status{flex:1;font-size:13px;color:var(--muted);margin:0}
+.status.sent{color:var(--good)}
+button.more-qs{background:none;border:1px dashed var(--border);color:var(--muted);border-radius:50px;padding:10px 16px;font-size:13px;cursor:pointer}
+button.more-qs:hover{color:var(--accent);border-color:var(--accent)}
+button.send{background:var(--accent);color:#fff;border:0;border-radius:10px;padding:12px 20px;font-size:15px;font-weight:600;cursor:pointer}
+button.send:disabled{opacity:.4;cursor:not-allowed}
+</style>
+</head>
+<body>
+<main data-lavish-question="free-text-form">
+  <p class="kicker">grill-me-lavish · write it out</p>
+  <h1 id="question"></h1>
+  <p class="context" id="context"></p>
+  <div class="rec"><b>Agent asks</b> <span id="recommendation"></span></div>
+  <div id="fields"></div>
+  <div class="footer">
+    <p class="status" id="status">Write, then send.</p>
+    <button class="more-qs" id="moreQs" type="button" title="Tell the agent to go deeper on this topic">＋ More questions</button>
+    <button class="send" id="send">Send answers to agent</button>
+  </div>
+</main>
+<script>
+const CONFIG = {
+  question: "Tell me in your own words",
+  context: "Sometimes clicking flattens it. Each prompt below comes back to the agent as a separate keyed answer.",
+  recommendation: "Write rough — bullet fragments are fine; the structure does the tidying.",
+  fields: [
+    { key: "vision", label: "What does done look like?", placeholder: "The end state in your head…", required: true },
+    { key: "worries", label: "What are you most worried about?", placeholder: "The thing you'd regret not saying…", required: false },
+    { key: "context", label: "Anything I can't see from the code?", placeholder: "History, politics, constraints…", required: false },
+  ],
+};
+
+document.getElementById("question").textContent = CONFIG.question;
+document.getElementById("context").textContent = CONFIG.context;
+document.getElementById("recommendation").textContent = CONFIG.recommendation;
+
+const fields = document.getElementById("fields");
+for (const f of CONFIG.fields) {
+  const div = document.createElement("div");
+  div.className = "field";
+  const label = document.createElement("label");
+  label.textContent = f.label;
+  if (f.required) {
+    const req = document.createElement("span");
+    req.className = "req";
+    req.textContent = "*";
+    label.appendChild(req);
+  }
+  const ta = document.createElement("textarea");
+  ta.placeholder = f.placeholder || "";
+  ta.dataset.key = f.key;
+  ta.dataset.required = f.required ? "1" : "";
+  const count = document.createElement("div");
+  count.className = "count";
+  ta.addEventListener("input", () => {
+    count.textContent = ta.value.length ? ta.value.length + " chars" : "";
+    refresh();
+  });
+  div.appendChild(label);
+  div.appendChild(ta);
+  div.appendChild(count);
+  fields.appendChild(div);
+}
+
+const areas = [...fields.querySelectorAll("textarea")];
+function refresh() {
+  const missing = areas.some((a) => a.dataset.required && !a.value.trim());
+  document.getElementById("send").disabled = missing;
+}
+refresh();
+
+function markSent(msg) {
+  const s = document.getElementById("status");
+  s.textContent = msg;
+  s.classList.add("sent");
+}
+document.getElementById("send").addEventListener("click", () => {
+  const answers = {};
+  for (const a of areas) answers[a.dataset.key] = a.value.trim();
+  const filled = Object.entries(answers).filter(([, v]) => v);
+  const summary = "Written answers (" + filled.length + " of " + areas.length + " prompts): " +
+    filled.map(([k, v]) => k + ": " + (v.length > 120 ? v.slice(0, 120) + "…" : v)).join(" | ");
+  const data = { widget: "free-text-form", question: CONFIG.question, answers };
+  if (!window.lavish) { console.log("[grill-me-lavish]", summary, data); markSent("No Lavish session — logged to console."); return; }
+  window.lavish.queuePrompt(summary, { tag: "grill-answer", text: summary, element: document.querySelector("main"), data });
+  window.lavish.sendQueuedPrompts();
+  markSent("Sent ✓ — edit and send again if you want; the agent uses the latest.");
+});
+document.getElementById("moreQs").addEventListener("click", () => {
+  const summary = "User pressed 'More questions' — offer additional, deeper questions on this topic before moving on.";
+  const data = { widget: "meta", request: "more-questions", about: CONFIG.question };
+  if (!window.lavish) { console.log("[grill-me-lavish]", summary, data); markSent("No Lavish session — logged to console."); return; }
+  const sendOne = window.lavish.sendPrompt || ((p, o) => { window.lavish.queuePrompt(p, o); window.lavish.sendQueuedPrompts(); });
+  sendOne(summary, { tag: "grill-meta", text: "More questions requested", element: document.querySelector("main"), data });
+  markSent("Asked for more questions ✓ — new questions will appear; your queued answers stay put until you send them.");
+});
+</script>
+</body>
+</html>

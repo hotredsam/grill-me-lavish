@@ -12,26 +12,26 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>grill-me-lavish demo interview</title>
 <style>
-:root{--bg:#14161a;--card:#1d2026;--text:#e8eaed;--muted:#9aa0a6;--accent:#f4c95d;--border:#2c3038;--good:#7dc98f;--bad:#e07a7a}
+:root{--bg:oklch(0.975 0.006 75);--card:oklch(0.995 0.003 75);--text:oklch(0.22 0.01 50);--muted:oklch(0.42 0.012 50);--accent:oklch(0.52 0.18 18);--border:oklch(0.88 0.008 60);--good:oklch(0.48 0.12 145);--bad:oklch(0.52 0.2 28)}
 *{box-sizing:border-box}
-body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;display:flex;justify-content:center;padding:32px 16px 96px}
+body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font:16px/1.5 Geist,system-ui,-apple-system,"Segoe UI",sans-serif;display:flex;justify-content:center;padding:32px 16px 96px}
 main{width:100%;max-width:680px}
-.kicker{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+.kicker{font-family:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
 h1{font-size:26px;margin:0 0 6px}
 .lede{color:var(--muted);margin:0 0 28px}
 section{border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:20px}
 section h2{font-size:18px;margin:0 0 4px}
 section .ctx{font-size:14px;color:var(--muted);margin:0 0 12px}
-.rec{background:rgba(244,201,93,.08);border:1px solid rgba(244,201,93,.35);border-radius:10px;padding:8px 12px;margin:0 0 14px;font-size:13px}
+.rec{background:oklch(0.96 0.04 18);border:1px solid oklch(0.85 0.08 18);border-radius:10px;padding:8px 12px;margin:0 0 14px;font-size:13px}
 .rec b{color:var(--accent);font-weight:600;margin-right:6px}
 button.queue{background:none;border:1px solid var(--accent);color:var(--accent);border-radius:9px;padding:8px 14px;font-size:14px;font-weight:600;cursor:pointer;margin-top:12px}
-button.queue:hover{background:rgba(244,201,93,.1)}
+button.queue:hover{background:oklch(0.96 0.04 18)}
 .qstate{display:inline-block;margin-left:10px;font-size:13px;color:var(--good)}
 /* drag-rank */
 ol.rank{list-style:none;margin:0;padding:0}
 ol.rank li{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:6px;cursor:grab}
 ol.rank li.dragging{opacity:.4}
-ol.rank .pos{width:22px;height:22px;border-radius:50%;background:rgba(244,201,93,.15);color:var(--accent);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+ol.rank .pos{width:22px;height:22px;border-radius:50%;background:oklch(0.96 0.04 18);color:var(--accent);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 ol.rank .label{flex:1;min-width:0}
 ol.rank .grip{color:var(--muted);letter-spacing:2px;user-select:none}
 /* pad */
@@ -39,25 +39,25 @@ ol.rank .grip{color:var(--muted);letter-spacing:2px;user-select:none}
 .pad .end{position:absolute;font-size:11px;color:var(--muted);pointer-events:none;padding:4px 6px}
 .pad .end.l{left:0;top:50%;transform:translateY(-50%)}.pad .end.r{right:0;top:50%;transform:translateY(-50%)}
 .pad .end.t{top:0;left:50%;transform:translateX(-50%)}.pad .end.b{bottom:0;left:50%;transform:translateX(-50%)}
-.dot{position:absolute;width:16px;height:16px;border-radius:50%;background:var(--accent);border:2px solid #1a1a1a;transform:translate(-50%,-50%)}
+.dot{position:absolute;width:16px;height:16px;border-radius:50%;background:var(--accent);border:2px solid #fff;transform:translate(-50%,-50%)}
 .padout{font-size:13px;color:var(--muted);margin:8px 0 0;font-variant-numeric:tabular-nums}
-/* strawman */
+/* suggested answer */
 .verdicts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .verdicts label{display:block;text-align:center;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 8px;cursor:pointer;font-size:14px}
 .verdicts input{display:none}
-.verdicts label:has(input:checked){border-color:var(--accent);background:rgba(244,201,93,.08)}
+.verdicts label:has(input:checked){border-color:var(--accent);background:oklch(0.96 0.04 18)}
 .proposal{background:var(--card);border-left:3px solid var(--accent);border-radius:8px;padding:10px 14px;font-size:14px;margin:0 0 12px}
 textarea{width:100%;margin-top:10px;background:var(--card);border:1px solid var(--border);border-radius:10px;color:var(--text);font:14px/1.5 inherit;padding:10px;resize:vertical;min-height:48px}
 /* send bar */
-.sendbar{position:fixed;left:0;right:0;bottom:0;background:rgba(20,22,26,.95);border-top:1px solid var(--border);padding:14px 16px;display:flex;justify-content:center}
+.sendbar{position:fixed;left:0;right:0;bottom:0;background:oklch(0.995 0.003 75 / 0.96);border-top:1px solid var(--border);padding:14px 16px;display:flex;justify-content:center}
 .sendbar .inner{width:100%;max-width:680px;display:flex;align-items:center;gap:16px}
 .sendbar .count{flex:1;font-size:13px;color:var(--muted)}
 .sendbar .count.ready{color:var(--good)}
-button.send{background:var(--accent);color:#1a1a1a;border:0;border-radius:10px;padding:12px 20px;font-size:15px;font-weight:600;cursor:pointer}
+button.send{background:var(--accent);color:#fff;border:0;border-radius:10px;padding:12px 20px;font-size:15px;font-weight:600;cursor:pointer}
 button.send:disabled{opacity:.4;cursor:not-allowed}
 @media (max-width:520px){.verdicts{grid-template-columns:minmax(0,1fr)}}
 button.round-more{width:44px;height:44px;border-radius:50%;background:none;border:1px dashed var(--accent);color:var(--accent);font-size:22px;line-height:1;cursor:pointer;flex-shrink:0}
-button.round-more:hover{background:rgba(244,201,93,.12)}
+button.round-more:hover{background:oklch(0.96 0.04 18)}
 </style>
 </head>
 <body>
@@ -87,8 +87,8 @@ button.round-more:hover{background:rgba(244,201,93,.12)}
   </section>
 
   <section data-lavish-question="demo-strawman">
-    <h2>3 · Strawman: default artifact location</h2>
-    <p class="ctx">React to the agent's proposed default.</p>
+    <h2>3 · Suggested answer: default artifact location</h2>
+    <p class="ctx">React to the agent's suggested answer.</p>
     <div class="proposal">Interview artifacts default to <code>.grill-me-lavish/</code> in the working directory, numbered in interview order.</div>
     <div class="verdicts">
       <label><input type="radio" name="verdict" value="accept">✅ Accept</label>
@@ -185,7 +185,7 @@ document.getElementById("queuePad").addEventListener("click", (e) => {
     e.target.closest("section"));
 });
 
-// 3 · strawman
+// 3 · suggested answer
 document.getElementById("queueStraw").addEventListener("click", (e) => {
   const section = e.target.closest("section");
   const checked = section.querySelector("input[name=verdict]:checked");
@@ -195,8 +195,8 @@ document.getElementById("queueStraw").addEventListener("click", (e) => {
     document.getElementById("stateStraw").textContent = "reason required for " + checked.value;
     return;
   }
-  lavishQueue("Straw", "Demo strawman verdict: " + checked.value + (reason ? " — " + reason : ""),
-    { widget: "strawman", question: "Default artifact location",
+  lavishQueue("Straw", "Demo suggested-answer verdict: " + checked.value + (reason ? " — " + reason : ""),
+    { widget: "suggested-answer", question: "Default artifact location",
       proposal: ".grill-me-lavish/ in the working directory, numbered", verdict: checked.value, reason },
     section);
 });
@@ -215,8 +215,8 @@ document.getElementById("moreRound").addEventListener("click", () => {
   const summary = "User pressed the round + button — pull up an additional round of questions.";
   const data = { widget: "meta", request: "more-questions" };
   if (window.lavish) {
-    window.lavish.queuePrompt(summary, { tag: "grill-meta", text: "More questions requested", element: document.querySelector(".sendbar"), data });
-    window.lavish.sendQueuedPrompts();
+    const sendOne = window.lavish.sendPrompt || ((pr, o) => { window.lavish.queuePrompt(pr, o); window.lavish.sendQueuedPrompts(); });
+    sendOne(summary, { tag: "grill-meta", text: "More questions requested", element: document.querySelector(".sendbar"), data });
   } else console.log("[grill-me-lavish demo]", summary, data);
   const count = document.getElementById("count");
   count.textContent = "Asked for more questions ✓";

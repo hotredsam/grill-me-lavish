@@ -110,6 +110,21 @@ function loadQueuedPrompts() {
   }
 }
 
+// grill-me-lavish: mirror the queue into the artifact iframe so pages can show
+// which questions already have queued answers (survives live reloads).
+function broadcastQueueState() {
+  postToFrame({
+    type: "lavish:queueState",
+    prompts: queued.map((item) => ({
+      prompt: String(item.prompt || ""),
+      tag: String(item.tag || ""),
+      text: String(item.text || ""),
+      selector: String(item.selector || ""),
+      queueKey: String(item._lavishQueueKey || ""),
+    })),
+  });
+}
+
 function persistQueuedPrompts() {
   try {
     if (queued.length) {
@@ -120,6 +135,7 @@ function persistQueuedPrompts() {
   } catch {
     // The in-memory queue still works if browser storage is unavailable.
   }
+  broadcastQueueState();
 }
 
 function render() {
@@ -309,7 +325,9 @@ function requestSnapshot(action) {
 }
 
 function sendQueued(endAfter) {
-  if (ended || agentPresence === "working") return;
+  // grill-me-lavish: sends are allowed while the agent is working - prompts
+  // queue server-side and deliver on the agent's next poll.
+  if (ended) return;
   closeMenus();
 
   const text = chatInput.value.trim();
@@ -700,6 +718,25 @@ async function reloadAfterServerRestart() {
   location.reload();
 }
 
+// grill-me-lavish: submit a single prompt immediately, leaving the local
+// queue (the user's unsent batched answers) untouched.
+async function sendPromptNow(item) {
+  if (ended || !item) return;
+  try {
+    const body = { prompts: [stripInternalPromptFields(item)], domSnapshot: "" };
+    const response = await fetch("/api/" + key + "/prompts", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!response.ok) throw new Error("failed to send prompt");
+    addChat("user", item.text || item.prompt);
+    if (agentPresence === "listening") setAgentPresence("working");
+  } catch {
+    enqueuePrompt(item);
+  }
+}
+
 window.addEventListener("message", (event) => {
   if (event.source !== frame.contentWindow) return;
 
@@ -724,6 +761,7 @@ window.addEventListener("message", (event) => {
     submitLayoutWarnings(msg.layout_warnings).catch(() => {});
   }
   if (msg.type === "lavish:sendQueuedPrompts") sendQueued();
+  if (msg.type === "lavish:sendPromptNow") sendPromptNow(msg.prompt);
   if (msg.type === "lavish:endSession") endSession();
   if (msg.type === "lavish:toggleAnnotationMode") toggleAnnotationMode();
 });
@@ -797,6 +835,9 @@ frame.addEventListener("load", () => {
   postToFrame({ type: "lavish:setAnnotationMode", enabled: annotation && !ended });
   // Replay the pre-reload scroll position so hot reloads don't jump the artifact to the top.
   postToFrame({ type: "lavish:restoreScroll", x: lastScroll.x, y: lastScroll.y });
+  // grill-me-lavish: replay the queue so the page can re-mark answered sections
+  // after a live reload - queued answers are never lost, and now they LOOK it.
+  broadcastQueueState();
 });
 
 initializeLayoutGate();
