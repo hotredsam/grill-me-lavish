@@ -113,6 +113,8 @@ npx -y github:hotredsam/grill-me-lavish end <html-file>    # end a session
 | `moscow-buckets` | scope triage: must-have / nice-to-have / won't-do |
 | `suggested-answer` | the agent has a concrete default and needs accept / tweak / reject + reason |
 | `annotation-canvas` | words fail — sketch it freehand with a note |
+| `risk-matrix` | several risks need triage on likelihood × impact — quadrant = action |
+| `free-text-form` | the user wants to write, with structure — labeled prompts, keyed answers |
 
 Every widget emits structured JSON through the injected SDK
 (`window.lavish.queuePrompt(...)` with a `data` payload). Each widget file is
@@ -125,8 +127,9 @@ gracefully (logs to console) when opened outside a session.
 Decided by grilling its own author with it (2026-07-06) — priorities by 100-point
 allocation: new widget types 30 · reliability 25 · interview flow 25 · theming 20.
 
-- New widget types (candidates under triage: risk matrix, timeline picker, budget
-  range, A/B compare, heat-map grid)
+- ~~New widget types~~ shipped: risk-matrix and free-text-form (the interview's
+  must-haves); nice-to-haves A/B compare and heat-map grid remain open; explicit
+  won't-dos: emoji reaction bar, budget range, timeline picker
 - Port the CPA v3 Night / Sepia / Sakura themes with a theme picker
 - Interview flow: instant response to ＋ More questions, visible interview progress
 - Every interview asks a minimum of three widget questions (now a SKILL.md rule)

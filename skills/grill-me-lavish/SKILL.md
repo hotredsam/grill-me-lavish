@@ -101,6 +101,8 @@ decision type and exact output shape.
 | Scope triage: must-have / nice-to-have / won't-do | `widgets/moscow-buckets.html` |
 | React to your recommended default: accept / tweak / reject with reason | `widgets/suggested-answer.html` |
 | When words fail: freeform sketch plus note | `widgets/annotation-canvas.html` |
+| Triage several risks on likelihood × impact (quadrant = action) | `widgets/risk-matrix.html` |
+| The user wants to WRITE, with structure — 2-4 labeled prompts, keyed answers | `widgets/free-text-form.html` |
 
 Default to `suggested-answer.html` when you have a strong recommendation and just need a
 gut-check; default to `confidence-slider.html` for ordinary single questions. Reach
