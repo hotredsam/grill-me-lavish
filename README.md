@@ -36,7 +36,7 @@ relative priorities — not just collecting answers faster.
    `npx -y github:hotredsam/grill-me-lavish <file>`.
 3. You interact — drag, allocate, place the dot, pick a verdict. Every widget shows
    the agent's recommended answer and usually starts pre-set to it, so you react to
-   a strawman instead of a blank form.
+   a concrete suggestion instead of a blank form.
 4. The widget sends your answer back as **structured JSON** (never prose the agent
    has to parse) through the engine's long-poll:
    `npx -y github:hotredsam/grill-me-lavish poll <file>`.
@@ -111,7 +111,7 @@ npx -y github:hotredsam/grill-me-lavish end <html-file>    # end a session
 | `pairwise` | true preference is best exposed by forced this-vs-that duels |
 | `confidence-slider` | an ordinary single question — the confidence tells the agent where to dig |
 | `moscow-buckets` | scope triage: must-have / nice-to-have / won't-do |
-| `strawman` | the agent has a concrete default and needs accept / tweak / reject + reason |
+| `suggested-answer` | the agent has a concrete default and needs accept / tweak / reject + reason |
 | `annotation-canvas` | words fail — sketch it freehand with a note |
 
 Every widget emits structured JSON through the injected SDK

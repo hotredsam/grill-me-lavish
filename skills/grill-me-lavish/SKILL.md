@@ -28,7 +28,7 @@ npx cache). If engine output shows a follow-up command starting with
 2. **Always attach your recommendation.** Every widget displays YOUR recommended
    answer (every widget template has a `recommendation` config field — fill it in,
    never leave it empty). Pre-select or pre-position the widget to your
-   recommendation when the widget supports it, so the user reacts to a strawman
+   recommendation when the widget supports it, so the user reacts to a concrete suggestion
    instead of facing a blank control.
 3. **Explore before you ask.** If a question can be answered by exploring the
    codebase (or the files/documents under discussion), explore instead of asking.
@@ -40,6 +40,10 @@ npx cache). If engine output shows a follow-up command starting with
 5. **Keep grilling until shared understanding.** After each answer, update your
    model of the plan, decide what the answer unlocks or invalidates, and move to
    the next unresolved branch. Summarize the full decision record at the end.
+6. **Never re-ask what is already answered.** Keep a running record of every
+   answer received. When feedback arrives, acknowledge it once and advance to new
+   ground — do not repeat a request, re-send the same browser reply, or ask the
+   user to redo an interaction that already round-tripped.
 
 ## Workflow per decision node
 
@@ -90,10 +94,10 @@ decision type and exact output shape.
 | True preference via this-vs-that forced choices | `widgets/pairwise.html` |
 | A single answer plus how sure the user is (tells you where to dig) | `widgets/confidence-slider.html` |
 | Scope triage: must-have / nice-to-have / won't-do | `widgets/moscow-buckets.html` |
-| React to your recommended default: accept / tweak / reject with reason | `widgets/strawman.html` |
+| React to your recommended default: accept / tweak / reject with reason | `widgets/suggested-answer.html` |
 | When words fail: freeform sketch plus note | `widgets/annotation-canvas.html` |
 
-Default to `strawman.html` when you have a strong recommendation and just need a
+Default to `suggested-answer.html` when you have a strong recommendation and just need a
 gut-check; default to `confidence-slider.html` for ordinary single questions. Reach
 for the heavier widgets (matrix, pairwise, allocation) when the decision genuinely
 involves competing options — do not use them to decorate simple questions.

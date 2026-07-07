@@ -1,44 +1,51 @@
 :root {
-  --ink-900: #0f1115;
-  --ink-800: #11141a;
-  --ink-700: #171a21;
-  --ink-600: #1c212b;
-  --steel-700: #2a2f3a;
-  --steel-600: #303745;
-  --steel-500: #3c4557;
-  --steel-400: #8c96aa;
-  --steel-300: #aeb6c6;
-  --steel-200: #b9c0cf;
-  --steel-100: #d8deea;
-  --cream-50: #fffbf3;
-  --cream-100: #f7f3ea;
-  --cream-200: #e8e1cf;
-  --brass-500: #f4c95d;
-  --brass-400: #ffd877;
-  --brass-ink: #17130a;
-  --sage-900: #172419;
-  --sage-700: #315f3a;
-  --sage-300: #8fe39e;
-  --amber-900: #25230f;
-  --amber-700: #5d4d1b;
-  --rust-500: #f06464;
-  --bg: var(--ink-900);
-  --bg-panel: var(--ink-800);
-  --bg-bar: var(--ink-700);
-  --bg-elevated: var(--ink-600);
-  --fg: var(--cream-100);
-  --fg-muted: var(--steel-100);
-  --fg-dim: var(--steel-200);
-  --fg-faint: var(--steel-300);
-  --fg-label: var(--steel-400);
-  --border: var(--steel-600);
-  --border-subtle: var(--steel-700);
-  --border-strong: var(--steel-500);
-  --accent: var(--brass-500);
-  --accent-hover: var(--brass-400);
-  --accent-ink: var(--brass-ink);
-  --danger: var(--rust-500);
-  --font-serif: "EB Garamond", "Iowan Old Style", Georgia, serif;
+  /* grill-me-lavish "Paper" theme — token values from CPA-Study-App-v3 (themes.css) */
+  --accent-hue: 18;
+  --canvas: oklch(0.975 0.006 75);
+  --canvas-2: oklch(0.955 0.008 70);
+  --surface: oklch(0.995 0.003 75);
+  --surface-2: oklch(0.965 0.006 70);
+  --ink: oklch(0.22 0.01 50);
+  --ink-dim: oklch(0.42 0.012 50);
+  --ink-faint: oklch(0.6 0.01 50);
+  --paper-border: oklch(0.88 0.008 60);
+  --paper-border-hi: oklch(0.78 0.01 60);
+  --track: oklch(0.92 0.008 60);
+  --paper-accent: oklch(0.52 0.18 var(--accent-hue));
+  --paper-accent-dark: oklch(0.42 0.18 var(--accent-hue));
+  --accent-faint: oklch(0.96 0.04 var(--accent-hue));
+  --accent-border: oklch(0.85 0.08 var(--accent-hue));
+  --good: oklch(0.48 0.12 145);
+  --good-soft: oklch(0.94 0.05 145);
+  --warn: oklch(0.58 0.14 60);
+  --warn-soft: oklch(0.94 0.06 60);
+  --bad: oklch(0.52 0.2 28);
+  --bad-soft: oklch(0.95 0.04 28);
+  /* legacy palette names still referenced below, remapped to Paper */
+  --steel-700: var(--canvas-2);
+  --sage-900: var(--good-soft);
+  --sage-700: var(--good);
+  --sage-300: var(--good);
+  --amber-900: var(--warn-soft);
+  --amber-700: var(--warn);
+  --brass-400: var(--warn);
+  --bg: var(--canvas);
+  --bg-panel: var(--surface);
+  --bg-bar: var(--surface-2);
+  --bg-elevated: var(--canvas-2);
+  --fg: var(--ink);
+  --fg-muted: var(--ink-dim);
+  --fg-dim: var(--ink-dim);
+  --fg-faint: var(--ink-faint);
+  --fg-label: var(--ink-faint);
+  --border: var(--paper-border);
+  --border-subtle: var(--track);
+  --border-strong: var(--paper-border-hi);
+  --accent: var(--paper-accent);
+  --accent-hover: var(--paper-accent-dark);
+  --accent-ink: #fff;
+  --danger: var(--bad);
+  --font-serif: "Instrument Serif", "Iowan Old Style", Georgia, serif;
   --font-sans: Geist, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --text-xs: 12px;
@@ -93,8 +100,8 @@
   --radius-pill: 999px;
   --hairline: 1px solid var(--border);
   --hairline-subtle: 1px solid var(--border-subtle);
-  --shadow-tooltip: 0 16px 44px rgba(0, 0, 0, 0.35);
-  --shadow-floating: 0 20px 70px rgba(0, 0, 0, 0.35);
+  --shadow-tooltip: 0 8px 24px rgba(40, 30, 20, 0.14);
+  --shadow-floating: 0 16px 40px rgba(40, 30, 20, 0.16);
   --bar-h: 56px;
   --panel-w: 360px;
   --ease: cubic-bezier(0.2, 0.6, 0.2, 1);
@@ -124,7 +131,7 @@ body {
   text-rendering: optimizeLegibility;
 }
 body.lavish {
-  color-scheme: dark;
+  color-scheme: light;
 }
 :focus-visible {
   outline: var(--annotate-outline);
@@ -375,7 +382,7 @@ body.lavish {
   opacity: 1;
 }
 .menu-item.danger:hover:not(:disabled) {
-  background: rgba(240, 100, 100, 0.1);
+  background: var(--bad-soft);
 }
 .button {
   border: 0;
@@ -431,7 +438,7 @@ body.lavish {
   display: grid;
   place-items: center;
   padding: var(--space-16);
-  background: rgba(15, 17, 21, 0.72);
+  background: oklch(0.22 0.01 50 / 0.45);
 }
 .share-overlay[hidden] {
   display: none;
@@ -866,7 +873,7 @@ body.lavish {
 .ended-overlay {
   position: fixed;
   inset: var(--bar-h) 0 0 0;
-  background: rgba(15, 17, 21, 0.86);
+  background: oklch(0.975 0.006 75 / 0.88);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -908,10 +915,10 @@ body.lavish {
   left: var(--space-8);
   right: var(--space-8);
   z-index: 20;
-  border: 1px solid rgba(244, 201, 93, 0.35);
+  border: 1px solid var(--warn);
   border-radius: var(--radius-lg);
-  background: rgba(37, 35, 15, 0.92);
-  color: var(--brass-400);
+  background: var(--warn-soft);
+  color: var(--ink);
   padding: var(--space-6) var(--space-8);
   font-size: var(--text-sm);
   line-height: var(--lh-sm);

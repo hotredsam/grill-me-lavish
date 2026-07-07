@@ -309,7 +309,9 @@ function requestSnapshot(action) {
 }
 
 function sendQueued(endAfter) {
-  if (ended || agentPresence === "working") return;
+  // grill-me-lavish: sends are allowed while the agent is working - prompts
+  // queue server-side and deliver on the agent's next poll.
+  if (ended) return;
   closeMenus();
 
   const text = chatInput.value.trim();
