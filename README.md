@@ -120,6 +120,17 @@ self-contained (no CDN dependencies) with a `CONFIG` block at the top the agent
 adapts per question, includes the round **＋ More questions** button, and degrades
 gracefully (logs to console) when opened outside a session.
 
+## Roadmap
+
+Decided by grilling its own author with it (2026-07-06) — priorities by 100-point
+allocation: new widget types 30 · reliability 25 · interview flow 25 · theming 20.
+
+- New widget types (candidates under triage: risk matrix, timeline picker, budget
+  range, A/B compare, heat-map grid)
+- Port the CPA v3 Night / Sepia / Sakura themes with a theme picker
+- Interview flow: instant response to ＋ More questions, visible interview progress
+- Every interview asks a minimum of three widget questions (now a SKILL.md rule)
+
 ## Requirements
 
 - **Node.js ≥ 22** (for `npx`)

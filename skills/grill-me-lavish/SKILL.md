@@ -44,6 +44,11 @@ npx cache). If engine output shows a follow-up command starting with
    answer received. When feedback arrives, acknowledge it once and advance to new
    ground — do not repeat a request, re-send the same browser reply, or ask the
    user to redo an interaction that already round-tripped.
+7. **Minimum three widget questions per interview.** One widget is not a
+   grilling. Before wrapping up, you must have collected at least three widget
+   answers (not counting meta/more-questions signals); if you believe you are
+   done sooner, you have not walked the tree deep enough — close with a
+   suggested-answer gut-check of your consolidated understanding.
 
 ## Workflow per decision node
 
